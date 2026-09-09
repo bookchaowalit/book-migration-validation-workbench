@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/migration-validation-workbench/reconciliation-result.schema.json",
+  "title": "Migration reconciliation result",
+  "type": "object",
+  "required": ["summary", "mapping_suggestions", "applied_mapping", "evidence"],
+  "properties": {
+    "summary": {
+      "type": "object",
+      "required": ["records_checked", "matched", "exceptions", "match_rate", "counts"],
+      "properties": {
+        "records_checked": {"type": "integer", "minimum": 0},
+        "matched": {"type": "integer", "minimum": 0},
+        "exceptions": {"type": "integer", "minimum": 0},
+        "match_rate": {"type": "number", "minimum": 0, "maximum": 100},
+        "counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}
+      },
+      "additionalProperties": true
+    },
+    "mapping_suggestions": {"type": "array"},
+    "applied_mapping": {"type": "object", "additionalProperties": {"type": "string"}},
+    "evidence": {"type": "array"},
+    "audit_package": {
+      "type": "object",
+      "required": ["schema_version", "rule_version", "inputs", "configuration", "fingerprints", "summary", "review_summary", "evidence", "privacy"],
+      "properties": {
+        "schema_version": {"const": "mvw.audit.v1"},
+        "rule_version": {"type": "string"},
+        "inputs": {"type": "object"},
+        "configuration": {"type": "object"},
+        "fingerprints": {"type": "object"},
+        "summary": {"type": "object"},
+        "review_summary": {"type": "object"},
+        "evidence": {"type": "array"},
+        "privacy": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "fuzzy_matching": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "candidate_minimum": {"type": "number", "minimum": 0, "maximum": 1},
+        "review_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+        "candidate_limit": {"type": "integer", "minimum": 1, "maximum": 5},
+        "auto_approval": {"const": false}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

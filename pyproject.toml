@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "migration-validation-workbench"
+version = "0.2.0"
+description = "Local-first CSV reconciliation and migration evidence workbench"
+requires-python = ">=3.10"
+dependencies = [
+    "duckdb>=1.0,<2.0",
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+]
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=14.0.0,<24.0.0"]
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["evals/tests"]

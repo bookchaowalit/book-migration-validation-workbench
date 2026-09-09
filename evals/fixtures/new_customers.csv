@@ -1,0 +1,5 @@
+account_no,customer_name,status,closed_at
+A-001,บริษัท เอ,ACTIVE,2024-01-01
+A-002,บริษัท บี,CLOSED,
+A-003,บริษัท ซี,CLOSED,2024-03-30
+A-005,บริษัท ใหม่,ACTIVE,
