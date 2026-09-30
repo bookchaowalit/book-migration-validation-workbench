@@ -1,8 +1,9 @@
 # Upgrade Plan
 
-**Current state: 7/10** — solid deterministic reconciliation core with
-privacy/audit packages, API + web now tested/built in CI; no persistence,
-auth or real DB connectors yet (by design for V1).
+**Current state: 7.5/10** — solid deterministic reconciliation core with
+privacy/audit packages, properly packaged (console script, wheel checked in
+CI), bounded inputs, API + web tested/built in CI; no persistence, auth or
+real DB connectors yet (by design for V1).
 
 ## Backlog
 
@@ -10,11 +11,11 @@ auth or real DB connectors yet (by design for V1).
 - (none open)
 
 ### P1
-- `pyproject.toml` declares `packages = []`, so `pip install -e .` installs
-  deps only and every entry point/test patches `sys.path`. Package the
-  `src/` trees properly (or a workspace) and drop the path hacks.
-- Row/column caps for inputs (e.g. 200k rows) with a clear 413-style error;
-  today only the 20 MB body and XLSX part size are bounded.
+- CSV rows are fully parsed before the row cap is checked (20 MB body bounds
+  it today); stream-count in `read_csv_text` if the body limit is raised.
+- Ship sample fixtures as package data (or an API-configurable path) so a
+  non-editable install serves the sample flow without
+  `MIGRATION_WORKBENCH_FIXTURES`.
 - Web: add Playwright or Testing Library smoke test for the sample flow
   (load sample → run → evidence table keyboard selection).
 
@@ -37,3 +38,17 @@ auth or real DB connectors yet (by design for V1).
 - Web a11y: labels for mapping/filter/search controls; evidence rows are
   keyboard-selectable (Enter/Space) with `aria-current`.
 - CI: ruff + pytest, and web `npm ci`/typecheck/build. `dev` extra added.
+
+## Done in this pass (pass 2)
+- Packaging: `pyproject.toml` now installs all six packages via explicit
+  `package-dir` mapping (monorepo `src/` trees); new
+  `migration_validation_api.cli` + `__main__`, console script
+  `migration-workbench`; `run.py` is a thin wrapper. Every `sys.path.insert`
+  removed from tests and entry points. CI builds the wheel, asserts every
+  package is inside, and starts the console script.
+- Fixture root overridable with `MIGRATION_WORKBENCH_FIXTURES`.
+- Input shape caps: 200,000 data rows / 500 columns per dataset
+  (`DatasetTooLarge` → HTTP 413 on `/api/inspect` and `/api/reconcile`);
+  XLSX stops parsing as soon as the row cap is crossed.
+- Tests 40 → 47; verified in a fresh venv (editable + wheel), server
+  `/api/health` smoke via the console script; ruff 0.16.9 `--select F` clean.

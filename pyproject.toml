@@ -17,8 +17,29 @@ dependencies = [
 parquet = ["pyarrow>=14.0.0,<24.0.0"]
 dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.5"]
 
+[project.scripts]
+migration-workbench = "migration_validation_api.cli:main"
+
+# Monorepo layout: each package keeps its own ``src/`` directory, and one
+# distribution installs all of them so tests and entry points need no
+# ``sys.path`` changes.
 [tool.setuptools]
-packages = []
+packages = [
+    "reconciliation_core",
+    "migration_data_engine",
+    "migration_input",
+    "migration_privacy",
+    "migration_audit",
+    "migration_validation_api",
+]
+
+[tool.setuptools.package-dir]
+reconciliation_core = "packages/reconciliation-core/src/reconciliation_core"
+migration_data_engine = "packages/data-engine/src/migration_data_engine"
+migration_input = "connectors/file-input/src/migration_input"
+migration_privacy = "packages/privacy/src/migration_privacy"
+migration_audit = "packages/audit/src/migration_audit"
+migration_validation_api = "apps/api/src/migration_validation_api"
 
 [tool.pytest.ini_options]
 testpaths = ["evals/tests"]

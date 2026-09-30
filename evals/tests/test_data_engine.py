@@ -1,12 +1,6 @@
-import pathlib
-import sys
 import unittest
 
-
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "data-engine" / "src"))
-
-from migration_data_engine import profile_dataset  # noqa: E402
+from migration_data_engine import profile_dataset
 
 
 class DataEngineTests(unittest.TestCase):

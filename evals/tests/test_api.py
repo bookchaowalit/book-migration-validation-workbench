@@ -1,23 +1,11 @@
 import base64
 import io
-import sys
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-for relative in (
-    "packages/reconciliation-core/src",
-    "packages/data-engine/src",
-    "connectors/file-input/src",
-    "packages/privacy/src",
-    "packages/audit/src",
-    "apps/api/src",
-):
-    sys.path.insert(0, str(PROJECT_ROOT / relative))
-
-from migration_input.input_contract import DatasetInputError, read_dataset_bytes  # noqa: E402
+from migration_input.input_contract import DatasetInputError, read_dataset_bytes
 
 try:
     from fastapi.testclient import TestClient
@@ -25,6 +13,8 @@ try:
     from migration_validation_api.server import MAX_BODY_BYTES, app
 except ImportError:  # pragma: no cover - fastapi/httpx are needed for API tests
     TestClient = None
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def xlsx_with_cell(reference: str) -> bytes:
@@ -121,6 +111,34 @@ class ApiTests(unittest.TestCase):
                 response = self.client.post("/api/reconcile", json=payload)
                 self.assertEqual(response.status_code, status)
                 self.assertIn("error", response.json())
+
+    def test_dataset_shape_limit_returns_413(self) -> None:
+        from migration_input import input_contract
+
+        with mock.patch.object(input_contract, "MAX_DATASET_ROWS", 1):
+            reconcile = self.client.post(
+                "/api/reconcile",
+                json={"legacy_csv": "id\n1\n2\n", "target_csv": "id\n1\n", "legacy_key": "id", "target_key": "id"},
+            )
+            inspect = self.client.post(
+                "/api/inspect",
+                json={"filename": "a.csv", "content_base64": base64.b64encode(b"id\n1\n2\n").decode()},
+            )
+        for response in (reconcile, inspect):
+            self.assertEqual(response.status_code, 413)
+            self.assertIn("row limit", response.json()["error"])
+
+    def test_console_script_is_registered(self) -> None:
+        from importlib import metadata
+
+        try:
+            scripts = metadata.entry_points(group="console_scripts")
+        except Exception:  # pragma: no cover - very old importlib.metadata
+            self.skipTest("entry point metadata unavailable")
+        names = {entry.name: entry.value for entry in scripts}
+        if "migration-workbench" not in names:
+            self.skipTest("project is not installed (pip install -e .)")
+        self.assertEqual(names["migration-workbench"], "migration_validation_api.cli:main")
 
     def test_inspect_strips_directory_parts_from_filenames(self) -> None:
         response = self.client.post(

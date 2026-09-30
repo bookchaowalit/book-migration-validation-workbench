@@ -72,8 +72,14 @@ python3 -m pip install -e '.[parquet]'
 ```bash
 cd projects/product/engineering/book-dev/github/bookchaowalit/book-apps/tools/book-migration-validation-workbench
 python3 -m pip install -e .
-python3 run.py
+migration-workbench            # หรือ python3 run.py / python3 -m migration_validation_api
 ```
+
+`pip install -e .` ติดตั้งทุก package ใน monorepo (`reconciliation_core`,
+`migration_data_engine`, `migration_input`, `migration_privacy`,
+`migration_audit`, `migration_validation_api`) จาก `src/` ของแต่ละโฟลเดอร์
+จึงไม่ต้องแก้ `sys.path`; ถ้าติดตั้งแบบ non-editable ให้ตั้ง
+`MIGRATION_WORKBENCH_FIXTURES=<repo>/evals/fixtures` เพื่อให้ปุ่มข้อมูลตัวอย่างใช้งานได้
 
 เปิดอีก terminal แล้วรัน:
 
@@ -92,6 +98,9 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev,parquet]"
 python3 -m unittest discover -s evals/tests -v   # หรือ python -m pytest -q
 ```
+
+ขนาด input: body ไม่เกิน 20 MB และแต่ละ dataset ไม่เกิน 200,000 แถว / 500
+คอลัมน์ (เกินแล้วได้ HTTP 413 พร้อมข้อความ error)
 
 API tests (`evals/tests/test_api.py`) ใช้ FastAPI `TestClient` ซึ่งต้องมี
 `httpx`; ถ้าไม่มีจะ skip อัตโนมัติ CI (`.github/workflows/ci.yml`) รัน ruff,

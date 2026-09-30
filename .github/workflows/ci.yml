@@ -26,6 +26,19 @@ jobs:
         run: ruff check --select F packages connectors apps/api evals run.py
       - name: Tests
         run: python -m pytest -q
+      - name: Wheel contains every package; console script starts
+        run: |
+          python -m pip wheel --no-deps -w "$RUNNER_TEMP/dist" .
+          python - "$RUNNER_TEMP/dist" <<'PY'
+          import pathlib, sys, zipfile
+          wheel = next(pathlib.Path(sys.argv[1]).glob("*.whl"))
+          tops = {name.split("/")[0] for name in zipfile.ZipFile(wheel).namelist()}
+          expected = {"reconciliation_core", "migration_data_engine", "migration_input",
+                      "migration_privacy", "migration_audit", "migration_validation_api"}
+          missing = expected - tops
+          assert not missing, f"wheel is missing packages: {sorted(missing)}"
+          PY
+          migration-workbench --help
 
   web:
     runs-on: ubuntu-latest

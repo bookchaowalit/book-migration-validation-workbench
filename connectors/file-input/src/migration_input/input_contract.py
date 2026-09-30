@@ -31,10 +31,23 @@ _XLSX_MAX_COLUMNS = 16_384
 # Upper bound on the decompressed size of any XLSX part we read, so a small
 # upload cannot expand into gigabytes in memory (zip bomb).
 _XLSX_MAX_PART_BYTES = 100 * 1024 * 1024
+# Shape limits for one dataset. Reconciliation keeps both sides in memory and
+# fuzzy matching is super-linear, so oversized inputs are refused up front.
+MAX_DATASET_ROWS = 200_000
+MAX_DATASET_COLUMNS = 500
 
 
 class DatasetInputError(ValueError):
     """Raised when an input cannot be safely normalized."""
+
+
+class DatasetTooLarge(DatasetInputError):
+    """Raised when a dataset exceeds the row or column limit (HTTP 413)."""
+
+
+def _check_rows(count: int) -> None:
+    if count > MAX_DATASET_ROWS:
+        raise DatasetTooLarge(f"Dataset exceeds the {MAX_DATASET_ROWS:,} data-row limit")
 
 
 class ParquetUnavailable(DatasetInputError):
@@ -122,6 +135,8 @@ def _format_from_filename(filename: str) -> str:
 
 def _validate_headers(raw_headers: Iterable[Any]) -> list[str]:
     headers = ["" if value is None else str(value).strip() for value in raw_headers]
+    if len(headers) > MAX_DATASET_COLUMNS:
+        raise DatasetTooLarge(f"Dataset exceeds the {MAX_DATASET_COLUMNS} column limit")
     if not headers or any(not header for header in headers):
         raise DatasetInputError("Dataset headers cannot be blank")
     normalized_headers = [normalize_header(header) for header in headers]
@@ -219,6 +234,8 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
                 if cells:
                     width = max(cells) + 1
                     matrix.append([cells.get(index, "") for index in range(width)])
+                    # Header row + data rows; fail before materialising more.
+                    _check_rows(len(matrix) - 1)
     except DatasetInputError:
         raise
     except (ElementTree.ParseError, KeyError, OSError, zipfile.BadZipFile) as exc:
@@ -262,6 +279,9 @@ def read_dataset_bytes(payload: bytes, filename: str) -> CanonicalDataset:
         fields, rows = _read_xlsx(payload)
     else:
         fields, rows = _read_parquet(payload)
+    if len(fields) > MAX_DATASET_COLUMNS:
+        raise DatasetTooLarge(f"Dataset exceeds the {MAX_DATASET_COLUMNS} column limit")
+    _check_rows(len(rows))
     return CanonicalDataset(
         filename=safe_filename,
         source_format=source_format,

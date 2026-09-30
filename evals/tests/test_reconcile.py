@@ -1,17 +1,14 @@
 import pathlib
-import sys
 import unittest
 
-
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "reconciliation-core" / "src"))
-
-from reconciliation_core.reconcile import (  # noqa: E402
+from reconciliation_core.reconcile import (
     generate_sql,
     read_csv_text,
     reconcile,
     suggest_mapping,
 )
+
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 class ReconciliationTests(unittest.TestCase):

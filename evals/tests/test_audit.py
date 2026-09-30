@@ -1,13 +1,7 @@
 import json
-import pathlib
-import sys
 import unittest
 
-
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "audit" / "src"))
-
-from migration_audit import build_audit_package  # noqa: E402
+from migration_audit import build_audit_package
 
 
 class AuditPackageTests(unittest.TestCase):

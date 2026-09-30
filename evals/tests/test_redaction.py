@@ -1,12 +1,6 @@
-import sys
 import unittest
-from pathlib import Path
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "privacy" / "src"))
-
-from migration_privacy.redaction import REDACTED, default_redact_fields, redact_result  # noqa: E402
+from migration_privacy.redaction import REDACTED, default_redact_fields, redact_result
 
 
 class RedactionTests(unittest.TestCase):
