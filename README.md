@@ -88,8 +88,18 @@ npm run dev
 รัน test:
 
 ```bash
-python3 -m unittest discover -s evals/tests -v
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev,parquet]"
+python3 -m unittest discover -s evals/tests -v   # หรือ python -m pytest -q
 ```
+
+API tests (`evals/tests/test_api.py`) ใช้ FastAPI `TestClient` ซึ่งต้องมี
+`httpx`; ถ้าไม่มีจะ skip อัตโนมัติ CI (`.github/workflows/ci.yml`) รัน ruff,
+Python tests และ `npm ci` + `typecheck` + `build` ของ `apps/web` ทุกครั้งที่ push
+
+Generated SQL: ชื่อตารางต้องเป็น identifier แบบ strict (`schema.table`) แต่ชื่อ
+column มาจาก header จริง จึง quote เป็น delimited identifier (รองรับช่องว่าง/ภาษาไทย,
+escape `"` เป็น `""`, ปฏิเสธ control character และยาวเกิน 128 ตัวอักษร)
 
 ## Flow ของข้อมูล
 
