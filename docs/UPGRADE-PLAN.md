@@ -63,3 +63,14 @@ real DB connectors yet (by design for V1).
   from a fresh non-editable venv outside the checkout (verified locally).
 - Note: a stale local `.venv` produced an empty editable-finder mapping;
   a fresh venv installs correctly (recreate `.venv` if imports fail).
+- Thai / Unicode reconciliation bugs: `normalize_header` kept only ASCII, so
+  every Thai header normalized to "" — a CSV with two Thai headers was
+  rejected as "headers must be unique" and `suggest_mapping` auto-selected
+  "ชื่อ" -> "ที่อยู่" at confidence 1.0. Headers/tokens now keep letters, marks
+  and digits of every script (NFKC + casefold). Thai-customer profile: the
+  Buddhist-era offset is applied before date validation (29/02/2567 was left
+  raw and 29/02/2568 became the impossible 2025-02-29); +66 landlines
+  (10 digits) map to 0x; Thai digits in phone/tax ID/date; zero-width
+  characters no longer break equality. `match_rate` never shows 100.0 with
+  exceptions (`_display_rate`). Tests in `test_normalization.py` and
+  `test_reconcile.py`.
