@@ -1,6 +1,6 @@
 # Upgrade Plan
 
-**Current state: 7.5/10** — solid deterministic reconciliation core with
+**Current state: 8/10** (pass 3: 7.5 -> 8) — solid deterministic reconciliation core with
 privacy/audit packages, properly packaged (console script, wheel checked in
 CI), bounded inputs, API + web tested/built in CI; no persistence, auth or
 real DB connectors yet (by design for V1).
@@ -13,9 +13,6 @@ real DB connectors yet (by design for V1).
 ### P1
 - CSV rows are fully parsed before the row cap is checked (20 MB body bounds
   it today); stream-count in `read_csv_text` if the body limit is raised.
-- Ship sample fixtures as package data (or an API-configurable path) so a
-  non-editable install serves the sample flow without
-  `MIGRATION_WORKBENCH_FIXTURES`.
 - Web: add Playwright or Testing Library smoke test for the sample flow
   (load sample → run → evidence table keyboard selection).
 
@@ -52,3 +49,17 @@ real DB connectors yet (by design for V1).
   XLSX stops parsing as soon as the row cap is crossed.
 - Tests 40 → 47; verified in a fresh venv (editable + wheel), server
   `/api/health` smoke via the console script; ruff 0.16.9 `--select F` clean.
+
+## Done in this pass (pass 3)
+- Sample datasets moved from `evals/fixtures/` into the API package
+  (`migration_validation_api/sample_data/`, declared as setuptools
+  package data); `FIXTURE_ROOT` defaults to it, so "ใช้ข้อมูลตัวอย่าง" works
+  from a wheel / non-editable install. `MIGRATION_WORKBENCH_FIXTURES` still
+  overrides.
+- Tests load samples via `importlib.resources`; traversal test now targets
+  `../server.py` (a real sibling file of the sample root). New test asserts
+  the sample flow bytes come from package data. 47 -> 48 tests.
+- CI asserts the wheel contains the sample CSVs and serves `/fixtures/*`
+  from a fresh non-editable venv outside the checkout (verified locally).
+- Note: a stale local `.venv` produced an empty editable-finder mapping;
+  a fresh venv installs correctly (recreate `.venv` if imports fail).

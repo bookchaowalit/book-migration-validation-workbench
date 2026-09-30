@@ -37,8 +37,24 @@ jobs:
                       "migration_privacy", "migration_audit", "migration_validation_api"}
           missing = expected - tops
           assert not missing, f"wheel is missing packages: {sorted(missing)}"
+          names = set(zipfile.ZipFile(wheel).namelist())
+          for sample in ("legacy_customers.csv", "new_customers.csv"):
+              assert f"migration_validation_api/sample_data/{sample}" in names, sample
           PY
           migration-workbench --help
+      - name: Non-editable install serves the sample data
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-venv"
+          "$RUNNER_TEMP/wheel-venv/bin/pip" install -q "$RUNNER_TEMP"/dist/*.whl httpx
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel-venv/bin/python" - <<'PY'
+          from fastapi.testclient import TestClient
+          from migration_validation_api.server import app
+          client = TestClient(app)
+          for name in ("legacy_customers.csv", "new_customers.csv"):
+              response = client.get(f"/fixtures/{name}")
+              assert response.status_code == 200 and response.content, name
+          PY
 
   web:
     runs-on: ubuntu-latest

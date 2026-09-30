@@ -2,6 +2,7 @@ import base64
 import io
 import unittest
 import zipfile
+from importlib.resources import files
 from pathlib import Path
 from unittest import mock
 
@@ -14,7 +15,8 @@ try:
 except ImportError:  # pragma: no cover - fastapi/httpx are needed for API tests
     TestClient = None
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Sample datasets ship as package data of migration_validation_api.
+SAMPLE_DATA_ROOT = Path(str(files("migration_validation_api") / "sample_data"))
 
 
 def xlsx_with_cell(reference: str) -> bytes:
@@ -60,10 +62,23 @@ class ApiTests(unittest.TestCase):
 
     def test_fixture_route_blocks_traversal(self) -> None:
         self.assertEqual(self.client.get("/fixtures/legacy_customers.csv").status_code, 200)
-        for path in ("/fixtures/../pyproject.toml", "/fixtures/%2e%2e/pyproject.toml",
-                     "/fixtures/%2e%2e%2fpyproject.toml", "/fixtures/missing.csv"):
+        # server.py sits next to sample_data/, so these would leak real code.
+        for path in ("/fixtures/../server.py", "/fixtures/%2e%2e/server.py",
+                     "/fixtures/%2e%2e%2fserver.py", "/fixtures/../../../../pyproject.toml",
+                     "/fixtures/missing.csv"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
+
+    def test_sample_flow_is_served_from_package_data(self) -> None:
+        from migration_validation_api import server
+
+        self.assertEqual(server.SAMPLE_DATA_ROOT.parent, Path(server.__file__).resolve().parent)
+        for name in ("legacy_customers.csv", "new_customers.csv"):
+            with self.subTest(name=name):
+                response = self.client.get(f"/fixtures/{name}")
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.headers["content-type"].startswith("text/csv"))
+                self.assertEqual(response.content, (server.SAMPLE_DATA_ROOT / name).read_bytes())
 
     def test_reconcile_with_spaced_and_thai_headers(self) -> None:
         response = self.client.post(
@@ -83,8 +98,8 @@ class ApiTests(unittest.TestCase):
         self.assertIn("audit_package", body)
 
     def test_reconcile_with_fixture_files_base64(self) -> None:
-        legacy = (PROJECT_ROOT / "evals/fixtures/legacy_customers.csv").read_bytes()
-        target = (PROJECT_ROOT / "evals/fixtures/new_customers.csv").read_bytes()
+        legacy = (SAMPLE_DATA_ROOT / "legacy_customers.csv").read_bytes()
+        target = (SAMPLE_DATA_ROOT / "new_customers.csv").read_bytes()
         response = self.client.post(
             "/api/reconcile",
             json={

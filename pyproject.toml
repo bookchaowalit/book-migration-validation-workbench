@@ -41,5 +41,9 @@ migration_privacy = "packages/privacy/src/migration_privacy"
 migration_audit = "packages/audit/src/migration_audit"
 migration_validation_api = "apps/api/src/migration_validation_api"
 
+# Synthetic sample datasets served by /fixtures/* ("use sample data").
+[tool.setuptools.package-data]
+migration_validation_api = ["sample_data/*.csv"]
+
 [tool.pytest.ini_options]
 testpaths = ["evals/tests"]

@@ -29,10 +29,11 @@ from reconciliation_core.normalization import available_profiles
 from reconciliation_core.reconcile import generate_sql, reconcile
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
-# Synthetic sample fixtures live in the repository checkout (editable
-# install). A non-editable install can point at them explicitly.
-FIXTURE_ROOT = Path(os.environ.get("MIGRATION_WORKBENCH_FIXTURES") or PROJECT_ROOT / "evals" / "fixtures")
+# Synthetic sample datasets ship inside the package (``sample_data`` is
+# declared as package data), so "use sample data" works from a wheel or a
+# non-editable install too. ``MIGRATION_WORKBENCH_FIXTURES`` still overrides.
+SAMPLE_DATA_ROOT = Path(__file__).resolve().parent / "sample_data"
+FIXTURE_ROOT = Path(os.environ.get("MIGRATION_WORKBENCH_FIXTURES") or SAMPLE_DATA_ROOT)
 MAX_BODY_BYTES = 20 * 1024 * 1024
 
 

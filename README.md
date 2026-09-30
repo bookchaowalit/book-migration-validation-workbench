@@ -16,7 +16,7 @@ packages/privacy         redacted export helpers
 packages/audit           deterministic, privacy-safe audit package
 packages/contracts       versioned JSON response schema
 connectors/file-input    CSV/TSV/XLSX/Parquet → canonical dataset
-evals                     sanitized fixtures and regression tests
+evals                     regression tests (sample CSVs ship in apps/api/.../sample_data)
 deploy                    future runtime/deployment controls
 ```
 
@@ -78,8 +78,9 @@ migration-workbench            # หรือ python3 run.py / python3 -m migrat
 `pip install -e .` ติดตั้งทุก package ใน monorepo (`reconciliation_core`,
 `migration_data_engine`, `migration_input`, `migration_privacy`,
 `migration_audit`, `migration_validation_api`) จาก `src/` ของแต่ละโฟลเดอร์
-จึงไม่ต้องแก้ `sys.path`; ถ้าติดตั้งแบบ non-editable ให้ตั้ง
-`MIGRATION_WORKBENCH_FIXTURES=<repo>/evals/fixtures` เพื่อให้ปุ่มข้อมูลตัวอย่างใช้งานได้
+จึงไม่ต้องแก้ `sys.path`; ข้อมูลตัวอย่าง (synthetic) อยู่ใน package ที่
+`apps/api/src/migration_validation_api/sample_data/` จึงใช้ปุ่มข้อมูลตัวอย่างได้ทั้ง
+editable และ wheel install (ตั้ง `MIGRATION_WORKBENCH_FIXTURES=<dir>` เพื่อใช้ชุดอื่นแทน)
 
 เปิดอีก terminal แล้วรัน:
 
