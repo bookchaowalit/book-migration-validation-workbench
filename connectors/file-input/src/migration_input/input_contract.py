@@ -24,7 +24,13 @@ from reconciliation_core.reconcile import normalize_header, read_csv_text
 
 
 INPUT_CONTRACT_VERSION = "mvw.input.v1"
-_CELL_REFERENCE_RE = re.compile(r"^[A-Z]+[1-9][0-9]*$")
+_CELL_REFERENCE_RE = re.compile(r"^[A-Z]{1,3}[1-9][0-9]*$")
+# Excel's own column limit (XFD). A crafted reference such as "ZZZZZZZ1"
+# would otherwise make the row matrix allocate billions of empty cells.
+_XLSX_MAX_COLUMNS = 16_384
+# Upper bound on the decompressed size of any XLSX part we read, so a small
+# upload cannot expand into gigabytes in memory (zip bomb).
+_XLSX_MAX_PART_BYTES = 100 * 1024 * 1024
 
 
 class DatasetInputError(ValueError):
@@ -160,6 +166,8 @@ def _column_index(cell_reference: str) -> int:
     value = 0
     for char in letters.group(0):
         value = value * 26 + ord(char) - ord("A") + 1
+    if value > _XLSX_MAX_COLUMNS:
+        raise DatasetInputError("XLSX cell reference exceeds the 16,384 column limit")
     return value - 1
 
 
@@ -179,6 +187,9 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
             names = set(archive.namelist())
             if "xl/worksheets/sheet1.xml" not in names:
                 raise DatasetInputError("XLSX must contain the first worksheet")
+            for part in ("xl/worksheets/sheet1.xml", "xl/sharedStrings.xml"):
+                if part in names and archive.getinfo(part).file_size > _XLSX_MAX_PART_BYTES:
+                    raise DatasetInputError("XLSX content exceeds the 100 MB decompressed limit")
             shared_strings: list[str] = []
             if "xl/sharedStrings.xml" in names:
                 shared_root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
@@ -210,7 +221,9 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
                     matrix.append([cells.get(index, "") for index in range(width)])
     except DatasetInputError:
         raise
-    except (ElementTree.ParseError, KeyError, OSError) as exc:
+    except (ElementTree.ParseError, KeyError, OSError, zipfile.BadZipFile) as exc:
+        # BadZipFile covers CRC mismatches, e.g. a part whose header lies about
+        # its decompressed size.
         raise DatasetInputError("XLSX worksheet could not be read") from exc
     return _rows_from_matrix(matrix)
 

@@ -415,6 +415,27 @@ def _quote_identifier(identifier: str) -> str:
     return ".".join(f'"{part}"' for part in parts)
 
 
+_MAX_COLUMN_IDENTIFIER_CHARS = 128
+
+
+def _quote_column(identifier: str) -> str:
+    """Quote a CSV-derived column name as one delimited SQL identifier.
+
+    Real headers contain spaces, Thai text, dots or quotes ("Customer Name"),
+    so they cannot use the strict table-name rule. Standard SQL delimited
+    identifiers are safe for any text once embedded double quotes are doubled;
+    control characters are rejected so the generated query stays readable.
+    """
+
+    if not isinstance(identifier, str) or not identifier.strip():
+        raise ValueError("SQL column identifiers cannot be blank")
+    if len(identifier) > _MAX_COLUMN_IDENTIFIER_CHARS:
+        raise ValueError(f"SQL column identifiers are limited to {_MAX_COLUMN_IDENTIFIER_CHARS} characters")
+    if any(ord(char) < 32 or ord(char) == 127 for char in identifier):
+        raise ValueError("SQL column identifiers cannot contain control characters")
+    return '"' + identifier.replace('"', '""') + '"'
+
+
 def generate_sql(
     legacy_table: str,
     target_table: str,
@@ -426,15 +447,15 @@ def generate_sql(
 
     legacy_table_sql = _quote_identifier(legacy_table)
     target_table_sql = _quote_identifier(target_table)
-    legacy_key_sql = _quote_identifier(legacy_key)
-    target_key_sql = _quote_identifier(target_key)
+    legacy_key_sql = _quote_column(legacy_key)
+    target_key_sql = _quote_column(target_key)
     comparisons = []
     for legacy_field, target_field in mapping.items():
         if legacy_field == legacy_key:
             continue
         comparisons.append(
-            f"    OR COALESCE(CAST(l.{_quote_identifier(legacy_field)} AS TEXT), '') "
-            f"<> COALESCE(CAST(t.{_quote_identifier(target_field)} AS TEXT), '')"
+            f"    OR COALESCE(CAST(l.{_quote_column(legacy_field)} AS TEXT), '') "
+            f"<> COALESCE(CAST(t.{_quote_column(target_field)} AS TEXT), '')"
         )
     mismatch_clause = "\n".join(comparisons) or "    OR 1 = 0"
     return (
