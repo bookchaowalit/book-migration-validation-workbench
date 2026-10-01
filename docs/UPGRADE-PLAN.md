@@ -74,3 +74,9 @@ real DB connectors yet (by design for V1).
   characters no longer break equality. `match_rate` never shows 100.0 with
   exceptions (`_display_rate`). Tests in `test_normalization.py` and
   `test_reconcile.py`.
+- Network exposure: the API has no authentication (local-only prototype), so
+  `migration-workbench --host` now refuses a non-loopback address unless
+  `--allow-remote` is passed; uploads and reconciliation results stay on the
+  machine by default. `evals/tests/test_cli_bind.py` (7 tests, uvicorn
+  stubbed). No route access matrix: there is no auth level to enforce yet
+  (backlog item with access control in `deploy/README.md`). No compose here.
