@@ -70,10 +70,14 @@ python3 -m pip install -e '.[parquet]'
 ```
 
 ```bash
-cd projects/product/engineering/book-dev/github/bookchaowalit/book-apps/tools/book-migration-validation-workbench
+# จาก root ของ repository นี้
 python3 -m pip install -e .
 migration-workbench            # หรือ python3 run.py / python3 -m migration_validation_api
 ```
+
+API ฟังที่ `http://127.0.0.1:8765` เป็นค่าเริ่มต้น (`--host`, `--port`); API ไม่มี
+authentication จึง bind ได้เฉพาะ loopback เว้นแต่ระบุ `--allow-remote` อย่างชัดเจน
+ฝั่ง web ตั้ง `NEXT_PUBLIC_API_BASE_URL` ได้ถ้า API ไม่ได้อยู่ที่ค่าเริ่มต้น
 
 `pip install -e .` ติดตั้งทุก package ใน monorepo (`reconciliation_core`,
 `migration_data_engine`, `migration_input`, `migration_privacy`,
@@ -85,7 +89,7 @@ editable และ wheel install (ตั้ง `MIGRATION_WORKBENCH_FIXTURES=<di
 เปิดอีก terminal แล้วรัน:
 
 ```bash
-cd projects/product/engineering/book-dev/github/bookchaowalit/book-apps/tools/book-migration-validation-workbench/apps/web
+cd apps/web
 npm install
 npm run dev
 ```
