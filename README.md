@@ -16,7 +16,7 @@ packages/privacy         redacted export helpers
 packages/audit           deterministic, privacy-safe audit package
 packages/contracts       versioned JSON response schema
 connectors/file-input    CSV/TSV/XLSX/Parquet → canonical dataset
-evals                     sanitized fixtures and regression tests
+evals                     regression tests (sample CSVs ship in apps/api/.../sample_data)
 deploy                    future runtime/deployment controls
 ```
 
@@ -70,15 +70,26 @@ python3 -m pip install -e '.[parquet]'
 ```
 
 ```bash
-cd projects/product/engineering/book-dev/github/bookchaowalit/book-apps/tools/book-migration-validation-workbench
+# จาก root ของ repository นี้
 python3 -m pip install -e .
-python3 run.py
+migration-workbench            # หรือ python3 run.py / python3 -m migration_validation_api
 ```
+
+API ฟังที่ `http://127.0.0.1:8765` เป็นค่าเริ่มต้น (`--host`, `--port`); API ไม่มี
+authentication จึง bind ได้เฉพาะ loopback เว้นแต่ระบุ `--allow-remote` อย่างชัดเจน
+ฝั่ง web ตั้ง `NEXT_PUBLIC_API_BASE_URL` ได้ถ้า API ไม่ได้อยู่ที่ค่าเริ่มต้น
+
+`pip install -e .` ติดตั้งทุก package ใน monorepo (`reconciliation_core`,
+`migration_data_engine`, `migration_input`, `migration_privacy`,
+`migration_audit`, `migration_validation_api`) จาก `src/` ของแต่ละโฟลเดอร์
+จึงไม่ต้องแก้ `sys.path`; ข้อมูลตัวอย่าง (synthetic) อยู่ใน package ที่
+`apps/api/src/migration_validation_api/sample_data/` จึงใช้ปุ่มข้อมูลตัวอย่างได้ทั้ง
+editable และ wheel install (ตั้ง `MIGRATION_WORKBENCH_FIXTURES=<dir>` เพื่อใช้ชุดอื่นแทน)
 
 เปิดอีก terminal แล้วรัน:
 
 ```bash
-cd projects/product/engineering/book-dev/github/bookchaowalit/book-apps/tools/book-migration-validation-workbench/apps/web
+cd apps/web
 npm install
 npm run dev
 ```
@@ -88,8 +99,21 @@ npm run dev
 รัน test:
 
 ```bash
-python3 -m unittest discover -s evals/tests -v
+python3 -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev,parquet]"
+python3 -m unittest discover -s evals/tests -v   # หรือ python -m pytest -q
 ```
+
+ขนาด input: body ไม่เกิน 20 MB และแต่ละ dataset ไม่เกิน 200,000 แถว / 500
+คอลัมน์ (เกินแล้วได้ HTTP 413 พร้อมข้อความ error)
+
+API tests (`evals/tests/test_api.py`) ใช้ FastAPI `TestClient` ซึ่งต้องมี
+`httpx`; ถ้าไม่มีจะ skip อัตโนมัติ CI (`.github/workflows/ci.yml`) รัน ruff,
+Python tests และ `npm ci` + `typecheck` + `build` ของ `apps/web` ทุกครั้งที่ push
+
+Generated SQL: ชื่อตารางต้องเป็น identifier แบบ strict (`schema.table`) แต่ชื่อ
+column มาจาก header จริง จึง quote เป็น delimited identifier (รองรับช่องว่าง/ภาษาไทย,
+escape `"` เป็น `""`, ปฏิเสธ control character และยาวเกิน 128 ตัวอักษร)
 
 ## Flow ของข้อมูล
 

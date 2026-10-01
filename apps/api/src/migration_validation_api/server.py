@@ -18,6 +18,7 @@ from migration_audit import build_audit_package
 from migration_input.input_contract import (
     CanonicalDataset,
     DatasetInputError,
+    DatasetTooLarge,
     configuration_fingerprint,
     decode_base64_payload,
     read_dataset_bytes,
@@ -28,8 +29,11 @@ from reconciliation_core.normalization import available_profiles
 from reconciliation_core.reconcile import generate_sql, reconcile
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
-FIXTURE_ROOT = PROJECT_ROOT / "evals" / "fixtures"
+# Synthetic sample datasets ship inside the package (``sample_data`` is
+# declared as package data), so "use sample data" works from a wheel or a
+# non-editable install too. ``MIGRATION_WORKBENCH_FIXTURES`` still overrides.
+SAMPLE_DATA_ROOT = Path(__file__).resolve().parent / "sample_data"
+FIXTURE_ROOT = Path(os.environ.get("MIGRATION_WORKBENCH_FIXTURES") or SAMPLE_DATA_ROOT)
 MAX_BODY_BYTES = 20 * 1024 * 1024
 
 
@@ -118,9 +122,13 @@ async def request_validation_error_handler(_request: Request, exc: RequestValida
     )
 
 
+def _input_error_status(exc: Exception) -> int:
+    return 413 if isinstance(exc, DatasetTooLarge) else 400
+
+
 @app.exception_handler(DatasetInputError)
 async def dataset_input_error_handler(_request: Request, exc: DatasetInputError):
-    return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"error": str(exc)}, status_code=_input_error_status(exc))
 
 
 @app.get("/", include_in_schema=False)
@@ -226,7 +234,7 @@ async def reconcile_endpoint(payload: ReconcilePayload) -> dict[str, Any] | JSON
         )
         return result
     except (DatasetInputError, ValueError, TypeError) as exc:
-        return JSONResponse({"error": str(exc)}, status_code=400)
+        return JSONResponse({"error": str(exc)}, status_code=_input_error_status(exc))
 
 
 def _dataset_from_file_payload(payload: BaseModel, prefix: str) -> CanonicalDataset:

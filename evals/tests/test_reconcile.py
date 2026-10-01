@@ -1,23 +1,22 @@
-import pathlib
-import sys
 import unittest
+from importlib.resources import files
+from pathlib import Path
 
-
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "reconciliation-core" / "src"))
-
-from reconciliation_core.reconcile import (  # noqa: E402
+from reconciliation_core.reconcile import (
     generate_sql,
     read_csv_text,
     reconcile,
     suggest_mapping,
 )
 
+# Sample datasets ship as package data of migration_validation_api.
+SAMPLE_DATA_ROOT = Path(str(files("migration_validation_api") / "sample_data"))
+
 
 class ReconciliationTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.legacy_csv = (PROJECT_ROOT / "evals" / "fixtures" / "legacy_customers.csv").read_text()
-        self.target_csv = (PROJECT_ROOT / "evals" / "fixtures" / "new_customers.csv").read_text()
+        self.legacy_csv = (SAMPLE_DATA_ROOT / "legacy_customers.csv").read_text()
+        self.target_csv = (SAMPLE_DATA_ROOT / "new_customers.csv").read_text()
         self.legacy_fields, self.legacy_rows = read_csv_text(self.legacy_csv)
         self.target_fields, self.target_rows = read_csv_text(self.target_csv)
 
@@ -222,6 +221,24 @@ class ReconciliationTests(unittest.TestCase):
                 ["id"], [{"id": "1"}], ["id"], [{"id": "1"}],
                 "id", "id", None, "generic", {evidence_id: "maybe"},
             )
+
+class UnicodeHeaderAndRateTests(unittest.TestCase):
+    def test_thai_headers_are_distinct_and_map_exactly(self) -> None:
+        from reconciliation_core.reconcile import read_csv_text, suggest_mapping
+
+        headers, _ = read_csv_text("รหัสลูกค้า,ชื่อ,เบอร์โทร\n1,a,b\n")
+        self.assertEqual(headers, ["รหัสลูกค้า", "ชื่อ", "เบอร์โทร"])
+        [suggestion] = suggest_mapping(["ชื่อ"], ["ที่อยู่", "ชื่อ"])
+        self.assertEqual(suggestion["target"], "ชื่อ")
+        self.assertEqual(suggestion["method"], "exact normalized name")
+
+    def test_match_rate_is_not_100_with_exceptions(self) -> None:
+        from reconciliation_core.reconcile import _display_rate
+
+        self.assertEqual(_display_rate(9999, 10000), 99.9)
+        self.assertEqual(_display_rate(10000, 10000), 100.0)
+        self.assertEqual(_display_rate(1, 10000), 0.1)
+        self.assertEqual(_display_rate(0, 0), 0.0)
 
 
 if __name__ == "__main__":

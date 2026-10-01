@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from datetime import datetime
+from datetime import date
 from typing import Any
 
 
@@ -61,8 +61,15 @@ def profile_metadata(profile: str | None) -> dict[str, Any]:
     return {"name": name, **PROFILE_DEFINITIONS[name], "raw_evidence_preserved": True}
 
 
+# Zero-width space / joiners, word joiner, BOM and soft hyphen: invisible,
+# not matched by ``\s`` and kept by NFKC, so "สมชาย\u200b" != "สมชาย".
+_INVISIBLE = re.compile("[\u00ad\u200b-\u200d\u2060\ufeff]")
+_THAI_DIGITS = str.maketrans("๐๑๒๓๔๕๖๗๘๙", "0123456789")
+
+
 def _text(value: Any) -> str:
     normalized = unicodedata.normalize("NFKC", "" if value is None else str(value))
+    normalized = _INVISIBLE.sub("", normalized)
     return re.sub(r"\s+", " ", normalized).strip().casefold()
 
 
@@ -93,33 +100,44 @@ def _normalize_name(value: str) -> str:
 
 
 def _normalize_phone(value: str) -> str:
-    digits = re.sub(r"\D+", "", value)
-    # Convert the common Thai international form +66 8x xxx xxxx to 0 8x...
-    if digits.startswith("66") and len(digits) == 11:
+    digits = re.sub(r"[^0-9]+", "", value.translate(_THAI_DIGITS))
+    # Convert the Thai international form to the domestic one: +66 8x xxx xxxx
+    # (mobile, 11 digits) and +66 2 xxx xxxx (Bangkok landline, 10 digits).
+    # Domestic numbers start with 0, so a leading 66 is always the country code.
+    if digits.startswith("66") and len(digits) in (10, 11):
         return "0" + digits[2:]
     return digits
 
 
 def _normalize_tax_id(value: str) -> str:
-    return re.sub(r"\D+", "", value)
+    return re.sub(r"[^0-9]+", "", value.translate(_THAI_DIGITS))
+
+
+_DATE_PATTERNS = (
+    re.compile(r"(?P<y>\d{4})[-/](?P<m>\d{1,2})[-/](?P<d>\d{1,2})"),
+    re.compile(r"(?P<d>\d{1,2})[-/.](?P<m>\d{1,2})[-/.](?P<y>\d{4})"),
+)
 
 
 def _normalize_date(value: str) -> str:
-    candidate = value.replace(" ", "")
-    formats = (
-        "%Y-%m-%d",
-        "%Y/%m/%d",
-        "%d-%m-%Y",
-        "%d/%m/%Y",
-        "%d.%m.%Y",
-    )
-    for date_format in formats:
-        try:
-            parsed = datetime.strptime(candidate, date_format)
-        except ValueError:
+    """Normalize Y-M-D / D-M-Y (Gregorian or Buddhist era) to ISO dates.
+
+    The Buddhist-era offset is applied *before* validating the day: strptime
+    on the BE year rejected 29/02/2567 (2024 CE is a leap year, 2567 is not)
+    and accepted 29/02/2568, producing the impossible 2025-02-29.
+    """
+    candidate = value.replace(" ", "").translate(_THAI_DIGITS)
+    for pattern in _DATE_PATTERNS:
+        match = pattern.fullmatch(candidate)
+        if not match:
             continue
-        year = parsed.year - 543 if parsed.year >= 2400 else parsed.year
-        return f"{year:04d}-{parsed.month:02d}-{parsed.day:02d}"
+        year, month, day = int(match["y"]), int(match["m"]), int(match["d"])
+        if year >= 2400:
+            year -= 543
+        try:
+            return date(year, month, day).isoformat()
+        except ValueError:
+            return value
     return value
 
 

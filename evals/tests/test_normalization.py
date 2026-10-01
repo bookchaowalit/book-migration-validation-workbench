@@ -1,17 +1,11 @@
-import pathlib
-import sys
 import unittest
 
-
-PROJECT_ROOT = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "reconciliation-core" / "src"))
-
-from reconciliation_core.normalization import (  # noqa: E402
+from reconciliation_core.normalization import (
     NormalizationProfileError,
     available_profiles,
     normalize_value,
 )
-from reconciliation_core.reconcile import reconcile  # noqa: E402
+from reconciliation_core.reconcile import reconcile
 
 
 class NormalizationTests(unittest.TestCase):
@@ -81,6 +75,25 @@ class NormalizationTests(unittest.TestCase):
         self.assertTrue(result["normalization"]["raw_evidence_preserved"])
         self.assertEqual(result["evidence"][0]["legacy"]["customer_name"], "นาย  สมชาย  ทดสอบ")
         self.assertEqual(result["evidence"][0]["target"]["phone"], "+66 81 000 0001")
+
+class ThaiEdgeCaseTests(unittest.TestCase):
+    def _thai(self, value: str, field: str) -> str:
+        return normalize_value(value, profile="thai_customer", field_name=field)
+
+    def test_buddhist_era_leap_day_uses_gregorian_calendar(self) -> None:
+        # 2567 BE = 2024 CE (leap); 2568 BE = 2025 CE (not leap).
+        self.assertEqual(self._thai("29/02/2567", "birth_date"), "2024-02-29")
+        self.assertEqual(self._thai("29/02/2568", "birth_date"), "29/02/2568")
+        self.assertEqual(self._thai("๑๕/๐๖/๒๕๖๙", "birth_date"), "2026-06-15")
+
+    def test_landline_country_code_and_thai_digits(self) -> None:
+        self.assertEqual(self._thai("+66 2 123 4567", "phone"), "021234567")
+        self.assertEqual(self._thai("๐๘๑-๒๓๔-๕๖๗๘", "phone"), "0812345678")
+        self.assertEqual(self._thai("๑-๒๓๔๕-๖๗๘๙๐-๑๒-๓", "tax_id"), "1234567890123")
+
+    def test_zero_width_characters_do_not_break_matches(self) -> None:
+        self.assertEqual(normalize_value("สมชาย\u200b"), normalize_value("สมชาย"))
+        self.assertEqual(self._thai("\ufeffนาย สมชาย", "name"), "สมชาย")
 
 
 if __name__ == "__main__":

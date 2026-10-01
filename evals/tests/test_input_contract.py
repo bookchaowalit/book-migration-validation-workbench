@@ -1,17 +1,13 @@
 import io
-import sys
 import unittest
 import zipfile
-from pathlib import Path
+from unittest import mock
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT / "packages" / "reconciliation-core" / "src"))
-sys.path.insert(0, str(PROJECT_ROOT / "connectors" / "file-input" / "src"))
-
-from migration_input.input_contract import (  # noqa: E402
+from migration_input import input_contract
+from migration_input.input_contract import (
     INPUT_CONTRACT_VERSION,
     DatasetInputError,
+    DatasetTooLarge,
     configuration_fingerprint,
     read_dataset_bytes,
 )
@@ -88,3 +84,31 @@ class InputContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DatasetShapeLimitTests(unittest.TestCase):
+    def test_default_limits_are_documented_values(self) -> None:
+        self.assertEqual(input_contract.MAX_DATASET_ROWS, 200_000)
+        self.assertEqual(input_contract.MAX_DATASET_COLUMNS, 500)
+
+    def test_csv_row_limit(self) -> None:
+        with mock.patch.object(input_contract, "MAX_DATASET_ROWS", 3):
+            self.assertEqual(read_dataset_bytes(b"id\n1\n2\n3\n", "a.csv").row_count, 3)
+            with self.assertRaises(DatasetTooLarge):
+                read_dataset_bytes(b"id\n1\n2\n3\n4\n", "a.csv")
+
+    def test_column_limit_for_csv_and_tsv(self) -> None:
+        with mock.patch.object(input_contract, "MAX_DATASET_COLUMNS", 2):
+            read_dataset_bytes(b"a,b\n1,2\n", "a.csv")
+            with self.assertRaises(DatasetTooLarge):
+                read_dataset_bytes(b"a,b,c\n1,2,3\n", "a.csv")
+            with self.assertRaises(DatasetTooLarge):
+                read_dataset_bytes(b"a\tb\tc\n1\t2\t3\n", "a.tsv")
+
+    def test_xlsx_row_limit_fails_while_parsing(self) -> None:
+        with mock.patch.object(input_contract, "MAX_DATASET_ROWS", 0):
+            with self.assertRaises(DatasetTooLarge):
+                read_dataset_bytes(minimal_xlsx(), "sample.xlsx")
+
+    def test_too_large_is_still_a_dataset_input_error(self) -> None:
+        self.assertTrue(issubclass(DatasetTooLarge, DatasetInputError))

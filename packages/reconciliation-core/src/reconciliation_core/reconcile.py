@@ -10,6 +10,7 @@ import csv
 import difflib
 import io
 import re
+import unicodedata
 from collections import defaultdict
 from typing import Any, Iterable, Mapping
 
@@ -47,10 +48,30 @@ def _string(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
+def _display_rate(part: int, whole: int) -> float:
+    """Percentage to one decimal that never reads 100.0 (or 0.0) unless exact.
+
+    ``round(99.96, 1)`` is 100.0, which reported a complete match while
+    exceptions remained.
+    """
+    if not whole:
+        return 0.0
+    rate = round(part / whole * 100, 1)
+    if rate >= 100.0 and part < whole:
+        return 99.9
+    if rate <= 0.0 and part > 0:
+        return 0.1
+    return rate
+
+
 def normalize_header(value: Any) -> str:
     """Normalize a column name for conservative matching."""
 
-    return re.sub(r"[^a-z0-9]", "", _string(value).casefold())
+    # Keep letters, marks and digits of every script. The old ASCII-only
+    # filter turned every Thai header into "", so two Thai headers were
+    # "duplicates" and "ชื่อ" mapped to "ที่อยู่" with confidence 1.0.
+    text = unicodedata.normalize("NFKC", _string(value)).casefold()
+    return "".join(char for char in text if unicodedata.category(char)[0] in "LMN")
 
 
 def read_csv_text(text: str) -> tuple[list[str], list[dict[str, str]]]:
@@ -78,7 +99,11 @@ def read_csv_text(text: str) -> tuple[list[str], list[dict[str, str]]]:
 
 
 def _token_set(value: str) -> set[str]:
-    return {token for token in re.findall(r"[a-z0-9]+", value.casefold()) if token}
+    text = unicodedata.normalize("NFKC", value).casefold()
+    # Split on anything that is not a letter, mark or digit (Thai vowel and
+    # tone marks are not ``\w``, so a regex word split would cut Thai words).
+    spaced = "".join(char if unicodedata.category(char)[0] in "LMN" else " " for char in text)
+    return set(spaced.split())
 
 
 def suggest_mapping(source_fields: Iterable[str], target_fields: Iterable[str]) -> list[dict[str, Any]]:
@@ -386,7 +411,7 @@ def reconcile(
         "target_records": len(target_rows),
         "matched": matched,
         "exceptions": exceptions,
-        "match_rate": round((matched / checked * 100) if checked else 0.0, 1),
+        "match_rate": _display_rate(matched, checked),
         "counts": counts,
     }
     return {
@@ -415,6 +440,27 @@ def _quote_identifier(identifier: str) -> str:
     return ".".join(f'"{part}"' for part in parts)
 
 
+_MAX_COLUMN_IDENTIFIER_CHARS = 128
+
+
+def _quote_column(identifier: str) -> str:
+    """Quote a CSV-derived column name as one delimited SQL identifier.
+
+    Real headers contain spaces, Thai text, dots or quotes ("Customer Name"),
+    so they cannot use the strict table-name rule. Standard SQL delimited
+    identifiers are safe for any text once embedded double quotes are doubled;
+    control characters are rejected so the generated query stays readable.
+    """
+
+    if not isinstance(identifier, str) or not identifier.strip():
+        raise ValueError("SQL column identifiers cannot be blank")
+    if len(identifier) > _MAX_COLUMN_IDENTIFIER_CHARS:
+        raise ValueError(f"SQL column identifiers are limited to {_MAX_COLUMN_IDENTIFIER_CHARS} characters")
+    if any(ord(char) < 32 or ord(char) == 127 for char in identifier):
+        raise ValueError("SQL column identifiers cannot contain control characters")
+    return '"' + identifier.replace('"', '""') + '"'
+
+
 def generate_sql(
     legacy_table: str,
     target_table: str,
@@ -426,15 +472,15 @@ def generate_sql(
 
     legacy_table_sql = _quote_identifier(legacy_table)
     target_table_sql = _quote_identifier(target_table)
-    legacy_key_sql = _quote_identifier(legacy_key)
-    target_key_sql = _quote_identifier(target_key)
+    legacy_key_sql = _quote_column(legacy_key)
+    target_key_sql = _quote_column(target_key)
     comparisons = []
     for legacy_field, target_field in mapping.items():
         if legacy_field == legacy_key:
             continue
         comparisons.append(
-            f"    OR COALESCE(CAST(l.{_quote_identifier(legacy_field)} AS TEXT), '') "
-            f"<> COALESCE(CAST(t.{_quote_identifier(target_field)} AS TEXT), '')"
+            f"    OR COALESCE(CAST(l.{_quote_column(legacy_field)} AS TEXT), '') "
+            f"<> COALESCE(CAST(t.{_quote_column(target_field)} AS TEXT), '')"
         )
     mismatch_clause = "\n".join(comparisons) or "    OR 1 = 0"
     return (
