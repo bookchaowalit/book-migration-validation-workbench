@@ -1,0 +1,8 @@
+system_id: bookchaowalit/book-apps/tools/book-migration-validation-workbench
+prefix: MVW
+brand: "MIGRATION WORKBENCH"
+subtitle: "ตรวจข้อมูลหลังย้ายระบบแบบมีหลักฐานต่อ record และพร้อมให้คนอนุมัติ"
+footer: "Migration Validation Workbench — ฉบับร่างเพื่อพิจารณา"
+color: "#2f4b6e"
+audience: internal
+tier: L2
