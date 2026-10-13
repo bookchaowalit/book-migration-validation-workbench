@@ -216,6 +216,10 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
                 cells: dict[int, str] = {}
                 for cell in row_element.findall("main:c", namespaces):
                     column = _column_index(cell.attrib.get("r", ""))
+                    # Bound every cell, including empty/data cells, before
+                    # decoding its value or expanding the sparse row.
+                    if column >= MAX_DATASET_COLUMNS:
+                        raise DatasetTooLarge(f"Dataset exceeds the {MAX_DATASET_COLUMNS} column limit")
                     cell_type = cell.attrib.get("t", "")
                     inline = cell.find("main:is", namespaces)
                     if cell_type == "inlineStr":

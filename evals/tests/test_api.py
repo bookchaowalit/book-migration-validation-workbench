@@ -19,11 +19,17 @@ except ImportError:  # pragma: no cover - fastapi/httpx are needed for API tests
 SAMPLE_DATA_ROOT = Path(str(files("migration_validation_api") / "sample_data"))
 
 
-def xlsx_with_cell(reference: str) -> bytes:
+def xlsx_with_cell(reference: str, *, in_data_row: bool = False, empty: bool = False) -> bytes:
+    cell = f'<c r="{reference}"/>' if empty else f'<c r="{reference}" t="inlineStr"><is><t>id</t></is></c>'
+    rows = (
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>id</t></is></c></row>'
+        f'<row r="2">{cell}</row>'
+        if in_data_row else f'<row r="1">{cell}</row>'
+    )
     worksheet = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'
-        f'<row r="1"><c r="{reference}" t="inlineStr"><is><t>id</t></is></c></row>'
+        f"{rows}"
         "</sheetData></worksheet>"
     )
     output = io.BytesIO()
@@ -142,6 +148,49 @@ class ApiTests(unittest.TestCase):
         for response in (reconcile, inspect):
             self.assertEqual(response.status_code, 413)
             self.assertIn("row limit", response.json()["error"])
+
+    def test_sparse_xlsx_column_limit_returns_413_for_inspect_and_reconcile(self) -> None:
+        for reference, in_data_row, empty in (("SG1", False, False), ("XFD2", True, False), ("XFD2", True, True)):
+            encoded = base64.b64encode(xlsx_with_cell(reference, in_data_row=in_data_row, empty=empty)).decode()
+            with self.subTest(reference=reference, empty=empty):
+                inspect = self.client.post("/api/inspect", json={"filename": "sparse.xlsx", "content_base64": encoded})
+                self.assertEqual(inspect.status_code, 413, inspect.text)
+                self.assertIn("500 column limit", inspect.json()["error"])
+                for side in ("legacy", "target"):
+                    other = "target" if side == "legacy" else "legacy"
+                    reconcile = self.client.post(
+                        "/api/reconcile",
+                        json={f"{side}_file_base64": encoded, f"{side}_filename": "sparse.xlsx",
+                              f"{other}_csv": "id\n1\n", "legacy_key": "id", "target_key": "id"},
+                    )
+                    self.assertEqual(reconcile.status_code, 413, reconcile.text)
+                    self.assertIn("500 column limit", reconcile.json()["error"])
+
+    def test_invalid_xlsx_geometry_returns_400(self) -> None:
+        encoded = base64.b64encode(xlsx_with_cell("XFE1")).decode()
+        for endpoint, payload in (
+            ("/api/inspect", {"filename": "invalid.xlsx", "content_base64": encoded}),
+            ("/api/reconcile", {"legacy_file_base64": encoded, "legacy_filename": "invalid.xlsx",
+                                "target_csv": "id\n1\n", "legacy_key": "id", "target_key": "id"}),
+        ):
+            with self.subTest(endpoint=endpoint):
+                response = self.client.post(endpoint, json=payload)
+                self.assertEqual(response.status_code, 400, response.text)
+                self.assertIn("cell reference", response.json()["error"])
+
+    def test_legitimate_xlsx_still_inspects_and_reconciles(self) -> None:
+        encoded = base64.b64encode(xlsx_with_cell("A2", in_data_row=True)).decode()
+        inspect = self.client.post("/api/inspect", json={"filename": "valid.xlsx", "content_base64": encoded})
+        self.assertEqual(inspect.status_code, 200, inspect.text)
+        self.assertEqual(inspect.json()["input"]["row_count"], 1)
+        reconcile = self.client.post(
+            "/api/reconcile",
+            json={"legacy_file_base64": encoded, "legacy_filename": "valid.xlsx",
+                  "target_file_base64": encoded, "target_filename": "valid.xlsx",
+                  "legacy_key": "id", "target_key": "id"},
+        )
+        self.assertEqual(reconcile.status_code, 200, reconcile.text)
+        self.assertEqual(reconcile.json()["summary"]["matched"], 1)
 
     def test_console_script_is_registered(self) -> None:
         from importlib import metadata

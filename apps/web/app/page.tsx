@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { buildRedactedReport, type ReviewStatus } from "../lib/report";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8765";
 
@@ -18,8 +19,6 @@ type Suggestion = {
   method: string;
   auto_selected: boolean;
 };
-
-type ReviewStatus = "unreviewed" | "approved" | "rejected" | "needs-review";
 
 type Evidence = {
   evidence_id: string;
@@ -94,7 +93,7 @@ type Result = {
     auto_approval: boolean;
   };
   review_summary?: Record<ReviewStatus, number>;
-  redacted_export?: Result;
+  redacted_export?: Result | null;
   audit_package?: AuditPackage;
   engine?: { legacy: Record<string, unknown>; target: Record<string, unknown> };
 };
@@ -269,36 +268,14 @@ export default function WorkbenchPage() {
     setReviewStatuses((current) => ({ ...current, [evidenceId]: status }));
   }
 
-  function makeReport() {
-    if (!result) return "";
-    const lines = [
-      "# Migration Validation Report",
-      "",
-      `- Generated: ${new Date().toISOString()}`,
-      `- Legacy file: ${legacy?.filename || "uploaded file"}`,
-      `- Target file: ${target?.filename || "uploaded file"}`,
-      `- Records checked: ${result.summary.records_checked}`,
-      `- Match rate: ${result.summary.match_rate}%`,
-      `- Exceptions: ${result.summary.exceptions}`,
-      `- Configuration fingerprint: ${result.configuration_fingerprint}`,
-      `- Audit package fingerprint: ${result.audit_package?.fingerprints.audit_package_sha256 || "not available"}`,
-      `- Normalization profile: ${result.normalization?.name || normalizationProfile}`,
-      `- Fuzzy review: ${result.fuzzy_matching?.enabled ? `enabled at ${Math.round((result.fuzzy_matching.review_threshold || Number(fuzzyThreshold)) * 100)}%` : "disabled"} · auto-approval: false`,
-      "- Export mode: field-profile redacted",
-      "",
-      "## Status counts",
-      "",
-      ...Object.entries(result.summary.counts).map(([status, count]) => `- ${status}: ${count}`),
-      "",
-      "## Review status",
-      "",
-      ...result.evidence.map((item) => `- ${item.key}: ${reviewLabel(reviewStatuses[item.evidence_id] || item.review_status)}`),
-      "",
-      "## Applied mapping",
-      "",
-      ...Object.entries(result.applied_mapping).map(([source, destination]) => `- \`${source}\` → \`${destination}\``),
-    ];
-    return lines.join("\n");
+  function downloadReport() {
+    if (!result) return;
+    try {
+      const report = buildRedactedReport(result, reviewStatuses);
+      download("migration-validation-report.md", report, "text/markdown;charset=utf-8");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "สร้าง report ไม่สำเร็จ");
+    }
   }
 
   const canRun = Boolean(legacy && target && legacyKey && targetKey);
@@ -367,7 +344,7 @@ export default function WorkbenchPage() {
 
       {result && <section className="results-section">
         <div className="summary-grid"><article className="metric-card accent"><span>RECORDS CHECKED</span><strong>{result.summary.records_checked.toLocaleString()}</strong><small>แถวฝั่ง legacy</small></article><article className="metric-card"><span>MATCH</span><strong>{result.summary.matched.toLocaleString()}</strong><small>{result.summary.match_rate}% match rate</small></article><article className="metric-card warn"><span>VALUE MISMATCH</span><strong>{(result.summary.counts.value_mismatch || 0).toLocaleString()}</strong><small>ค่าที่ mapped ไม่ตรง</small></article><article className="metric-card danger"><span>MISSING / DUPLICATE</span><strong>{((result.summary.counts.missing_target || 0) + (result.summary.counts.missing_legacy || 0) + (result.summary.counts.duplicate || 0) + (result.summary.counts.invalid_key || 0)).toLocaleString()}</strong><small>ต้อง review ก่อนปล่อย</small></article></div>
-        <div className="panel evidence-panel"><div className="panel-heading evidence-heading"><div><span className="section-kicker">03 / EVIDENCE</span><h3>Exceptions ที่ต้องตัดสินใจ</h3></div><div className="evidence-actions"><select aria-label="กรองตามสถานะ" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{statusOptions.map(([status, count]) => <option key={status} value={status}>{status} · {count}</option>)}</select><input type="search" aria-label="ค้นหา key" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา key..." /><button className="button ghost" onClick={() => download("migration-validation-report.md", makeReport(), "text/markdown;charset=utf-8")}>ดาวน์โหลด report</button><button className="button ghost" onClick={() => { if (result.audit_package) download("migration-validation-audit.json", JSON.stringify(result.audit_package, null, 2), "application/json;charset=utf-8"); }}>ดาวน์โหลด audit package</button><button className="button dark" onClick={() => { if (result.sql) void navigator.clipboard?.writeText(result.sql); }}>คัดลอก SQL</button></div></div>
+        <div className="panel evidence-panel"><div className="panel-heading evidence-heading"><div><span className="section-kicker">03 / EVIDENCE</span><h3>Exceptions ที่ต้องตัดสินใจ</h3></div><div className="evidence-actions"><select aria-label="กรองตามสถานะ" value={filter} onChange={(event) => setFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{statusOptions.map(([status, count]) => <option key={status} value={status}>{status} · {count}</option>)}</select><input type="search" aria-label="ค้นหา key" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหา key..." /><button className="button ghost" onClick={downloadReport}>ดาวน์โหลด report</button><button className="button ghost" onClick={() => { if (result.audit_package) download("migration-validation-audit.json", JSON.stringify(result.audit_package, null, 2), "application/json;charset=utf-8"); }}>ดาวน์โหลด audit package</button><button className="button dark" onClick={() => { if (result.sql) void navigator.clipboard?.writeText(result.sql); }}>คัดลอก SQL</button></div></div>
           <div className="evidence-layout"><div className="evidence-table-wrap"><table className="evidence-table"><thead><tr><th>Key</th><th>Status</th><th>Legacy</th><th>Target</th><th>Reason</th><th>Review</th></tr></thead><tbody>{filteredEvidence.map((item) => <tr key={`${item.key}-${item.status}-${item.reason}`} className={selected === item ? "selected" : ""} tabIndex={0} aria-current={selected === item ? "true" : undefined} onClick={() => setSelected(item)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelected(item); } }}><td><code>{item.key}</code></td><td><span className={`status-badge status-${item.status}`}>{item.status_label}</span></td><td>{firstValue(item.legacy)}</td><td>{firstValue(item.target)}</td><td className="muted">{item.reason}</td><td><span className={`review-badge review-${reviewStatuses[item.evidence_id] || item.review_status}`}>{reviewLabel(reviewStatuses[item.evidence_id] || item.review_status)}</span></td></tr>)}</tbody></table>{filteredEvidence.length === 0 && <div className="empty-state">ไม่พบรายการตาม filter นี้</div>}</div><aside className="drilldown">{selected ? <><div className="detail-header"><span className="section-kicker">DRILL DOWN</span><span className={`status-badge status-${selected.status}`}>{selected.status_label}</span></div><div className="detail-key">{selected.key}</div><div className="detail-reason">{selected.reason}</div><div className="review-controls"><span className="section-kicker">REVIEW DECISION</span><strong>{reviewLabel(reviewStatuses[selected.evidence_id] || selected.review_status)}</strong><div className="review-buttons"><button className="button ghost" onClick={() => setReviewStatus(selected.evidence_id, "approved")}>Approve</button><button className="button ghost" onClick={() => setReviewStatus(selected.evidence_id, "rejected")}>Reject</button><button className="button ghost" onClick={() => setReviewStatus(selected.evidence_id, "needs-review")}>Needs review</button></div></div>{selected.match_candidates.length > 0 && <div className="candidate-box"><span className="section-kicker">FUZZY CANDIDATES · REVIEW ONLY</span>{selected.match_candidates.map((candidate, index) => { const candidateKey = candidate.candidate_key || candidate.target_key || "(blank)"; return <div className="candidate-row" key={`${candidateKey}-${candidate.row_number}-${index}`}><strong>{candidateKey} · {Math.round(candidate.score * 100)}%</strong><span className="muted">{candidate.reason}</span></div>; })}</div>}<span className="section-kicker">FIELD DIFFERENCES</span>{selected.mismatches.length ? selected.mismatches.map((diff) => <div className="diff-row" key={`${diff.legacy_field}-${diff.target_field}`}><div className="diff-cell"><span>{diff.legacy_field} · legacy</span><strong>{diff.legacy_value || "(blank)"}</strong></div><div className="diff-cell"><span>{diff.target_field} · target</span><strong>{diff.target_value || "(blank)"}</strong></div></div>) : <p className="muted">ไม่มี field ที่เปรียบเทียบแล้วพบความต่าง</p>}</> : <><span className="section-kicker">DRILL DOWN</span><h4>เลือกแถวเพื่อดู evidence</h4><p className="muted">ค่าฝั่งเก่าและใหม่จะแสดงคู่กัน พร้อม field ที่ไม่ตรงและเหตุผลจาก rule ที่ใช้ตรวจ</p></>}</aside></div>
         </div>
       </section>}

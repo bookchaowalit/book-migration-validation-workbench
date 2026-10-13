@@ -30,6 +30,25 @@ def minimal_xlsx() -> bytes:
     return output.getvalue()
 
 
+def xlsx_from_rows(*rows: str) -> bytes:
+    worksheet = (
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        f'<sheetData>{"".join(rows)}</sheetData></worksheet>'
+    )
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("xl/worksheets/sheet1.xml", worksheet)
+    return output.getvalue()
+
+
+def excel_column(number: int) -> str:
+    letters = ""
+    while number:
+        number, remainder = divmod(number - 1, 26)
+        letters = chr(ord("A") + remainder) + letters
+    return letters
+
+
 class InputContractTests(unittest.TestCase):
     def test_csv_is_normalized_with_metadata_and_safe_filename(self) -> None:
         payload = "account_no,customer_name\nA-001,สมชาย ทดสอบ\n".encode("utf-8")
@@ -109,6 +128,55 @@ class DatasetShapeLimitTests(unittest.TestCase):
         with mock.patch.object(input_contract, "MAX_DATASET_ROWS", 0):
             with self.assertRaises(DatasetTooLarge):
                 read_dataset_bytes(minimal_xlsx(), "sample.xlsx")
+
+    def test_xlsx_column_limit_is_checked_before_dense_allocation(self) -> None:
+        def guarded_range(width: int) -> range:
+            self.assertLessEqual(width, 500, "Oversized XLSX row expanded before rejection")
+            return range(width)
+
+        header = '<row r="1"><c r="A1" t="inlineStr"><is><t>id</t></is></c></row>'
+        values = (
+            't="inlineStr"><is><t>value</t></is>',
+            't="b"><v>1</v>',
+            '><v>7</v>',
+            't="s"><v>999</v>',
+            '>',
+        )
+        for column in ("SG", "XFD"):
+            for row_number in (1, 2):
+                for cell_value in values:
+                    with self.subTest(column=column, row=row_number, cell_value=cell_value):
+                        row = f'<row r="{row_number}"><c r="{column}{row_number}" {cell_value}</c></row>'
+                        payload = xlsx_from_rows(*([header, row] if row_number == 2 else [row]))
+                        with mock.patch.object(input_contract, "range", guarded_range, create=True):
+                            with self.assertRaisesRegex(DatasetTooLarge, "500 column limit"):
+                                read_dataset_bytes(payload, "sparse.xlsx")
+
+    def test_xlsx_accepts_exactly_500_columns_with_normal_cell_types(self) -> None:
+        headers = "".join(
+            f'<c r="{excel_column(column)}1" t="inlineStr"><is><t>field_{column}</t></is></c>'
+            for column in range(1, 501)
+        )
+        payload = xlsx_from_rows(
+            f'<row r="1">{headers}</row>',
+            '<row r="2"><c r="A2" t="inlineStr"><is><t>record</t></is></c>'
+            '<c r="B2"><v>7</v></c><c r="C2"/><c r="SF2" t="b"><v>1</v></c></row>',
+        )
+        dataset = read_dataset_bytes(payload, "boundary.xlsx")
+        self.assertEqual(len(dataset.fields), 500)
+        self.assertEqual(dataset.row_count, 1)
+        self.assertEqual(dataset.rows[0]["field_1"], "record")
+        self.assertEqual(dataset.rows[0]["field_2"], "7")
+        self.assertEqual(dataset.rows[0]["field_3"], "")
+        self.assertEqual(dataset.rows[0]["field_500"], "TRUE")
+
+    def test_invalid_excel_geometry_is_not_a_dataset_size_error(self) -> None:
+        for reference in ("XFE1", "ZZZZZZZ1", "A0", "A-1"):
+            with self.subTest(reference=reference):
+                payload = xlsx_from_rows(f'<row r="1"><c r="{reference}"/></row>')
+                with self.assertRaises(DatasetInputError) as raised:
+                    read_dataset_bytes(payload, "invalid.xlsx")
+                self.assertNotIsInstance(raised.exception, DatasetTooLarge)
 
     def test_too_large_is_still_a_dataset_input_error(self) -> None:
         self.assertTrue(issubclass(DatasetTooLarge, DatasetInputError))
