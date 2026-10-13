@@ -24,7 +24,7 @@ deploy                    future runtime/deployment controls
 
 เอกสารผลิตภัณฑ์:
 
-- [Product brief](../../../../../../../../../life-opportunities-api/business/cli-tools/MIGRATION-VALIDATION-WORKBENCH-PRODUCT-BRIEF.md)
+- [Product brief](../../../../../../../../../opportunities/business/cli-tools/MIGRATION-VALIDATION-WORKBENCH-PRODUCT-BRIEF.md)
 - [V1.1 plan](../../../../../../../../../plans/decision-context/MIGRATION-VALIDATION-WORKBENCH-V1.1.md)
 
 ## สิ่งที่ทำได้
