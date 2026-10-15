@@ -131,6 +131,11 @@ Native file bytes in browser
 
 ไฟล์ตัวอย่างเป็นข้อมูลสมมติเท่านั้น ห้ามใส่ข้อมูลลูกค้าจริงใน fixture, logs หรือ commit ลง repository
 
+## Walkthrough ข้อมูลไทยสมมติ
+
+[คู่มือ operator และสคริปต์ตรวจซ้ำ](docs/SYNTHETIC-OPERATOR-WALKTHROUGH.md)
+แยกผล AI-assisted dry run ออกจากหลักฐานผู้ใช้ที่ไม่ได้สร้างระบบ
+
 ## เกณฑ์พิสูจน์ตลาดรอบถัดไป
 
 1. ให้ data/IT operator 5 คนลองกับ export ที่ลบข้อมูลระบุตัวตนแล้ว
