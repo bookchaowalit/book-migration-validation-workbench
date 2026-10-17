@@ -47,7 +47,9 @@ class DatasetTooLarge(DatasetInputError):
 
 def _check_rows(count: int) -> None:
     if count > MAX_DATASET_ROWS:
-        raise DatasetTooLarge(f"Dataset exceeds the {MAX_DATASET_ROWS:,} data-row limit")
+        raise DatasetTooLarge(
+            f"Dataset exceeds the {MAX_DATASET_ROWS:,} data-row limit"
+        )
 
 
 class ParquetUnavailable(DatasetInputError):
@@ -145,7 +147,9 @@ def _validate_headers(raw_headers: Iterable[Any]) -> list[str]:
     return headers
 
 
-def _rows_from_matrix(matrix: list[list[Any]]) -> tuple[list[str], list[dict[str, str]]]:
+def _rows_from_matrix(
+    matrix: list[list[Any]],
+) -> tuple[list[str], list[dict[str, str]]]:
     if not matrix:
         raise DatasetInputError("Dataset must contain a header row")
     fields = _validate_headers(matrix[0])
@@ -203,12 +207,22 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
             if "xl/worksheets/sheet1.xml" not in names:
                 raise DatasetInputError("XLSX must contain the first worksheet")
             for part in ("xl/worksheets/sheet1.xml", "xl/sharedStrings.xml"):
-                if part in names and archive.getinfo(part).file_size > _XLSX_MAX_PART_BYTES:
-                    raise DatasetInputError("XLSX content exceeds the 100 MB decompressed limit")
+                if (
+                    part in names
+                    and archive.getinfo(part).file_size > _XLSX_MAX_PART_BYTES
+                ):
+                    raise DatasetInputError(
+                        "XLSX content exceeds the 100 MB decompressed limit"
+                    )
             shared_strings: list[str] = []
             if "xl/sharedStrings.xml" in names:
-                shared_root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
-                shared_strings = [_xml_text(item) for item in shared_root.findall("main:si", namespaces)]
+                shared_root = ElementTree.fromstring(
+                    archive.read("xl/sharedStrings.xml")
+                )
+                shared_strings = [
+                    _xml_text(item)
+                    for item in shared_root.findall("main:si", namespaces)
+                ]
 
             root = ElementTree.fromstring(archive.read("xl/worksheets/sheet1.xml"))
             matrix: list[list[str]] = []
@@ -219,19 +233,27 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
                     # Bound every cell, including empty/data cells, before
                     # decoding its value or expanding the sparse row.
                     if column >= MAX_DATASET_COLUMNS:
-                        raise DatasetTooLarge(f"Dataset exceeds the {MAX_DATASET_COLUMNS} column limit")
+                        raise DatasetTooLarge(
+                            f"Dataset exceeds the {MAX_DATASET_COLUMNS} column limit"
+                        )
                     cell_type = cell.attrib.get("t", "")
                     inline = cell.find("main:is", namespaces)
                     if cell_type == "inlineStr":
                         value = _xml_text(inline) if inline is not None else ""
                     else:
                         value_element = cell.find("main:v", namespaces)
-                        value = value_element.text.strip() if value_element is not None and value_element.text else ""
+                        value = (
+                            value_element.text.strip()
+                            if value_element is not None and value_element.text
+                            else ""
+                        )
                         if cell_type == "s" and value:
                             try:
                                 value = shared_strings[int(value)]
                             except (IndexError, ValueError) as exc:
-                                raise DatasetInputError("XLSX shared string reference is invalid") from exc
+                                raise DatasetInputError(
+                                    "XLSX shared string reference is invalid"
+                                ) from exc
                         elif cell_type == "b":
                             value = "TRUE" if value == "1" else "FALSE"
                     cells[column] = value
@@ -260,7 +282,10 @@ def _read_parquet(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
         table = parquet.read_table(io.BytesIO(payload))
         fields = _validate_headers(table.column_names)
         rows = [
-            {field: "" if row.get(field) is None else str(row.get(field)).strip() for field in fields}
+            {
+                field: "" if row.get(field) is None else str(row.get(field)).strip()
+                for field in fields
+            }
             for row in table.to_pylist()
         ]
         return fields, rows

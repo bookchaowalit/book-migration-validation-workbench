@@ -94,7 +94,12 @@ def read_csv_text(text: str) -> tuple[list[str], list[dict[str, str]]]:
 
     rows: list[dict[str, str]] = []
     for row in reader:
-        rows.append({header: _string(row.get(raw_header)) for header, raw_header in zip(headers, raw_headers)})
+        rows.append(
+            {
+                header: _string(row.get(raw_header))
+                for header, raw_header in zip(headers, raw_headers)
+            }
+        )
     return headers, rows
 
 
@@ -102,11 +107,15 @@ def _token_set(value: str) -> set[str]:
     text = unicodedata.normalize("NFKC", value).casefold()
     # Split on anything that is not a letter, mark or digit (Thai vowel and
     # tone marks are not ``\w``, so a regex word split would cut Thai words).
-    spaced = "".join(char if unicodedata.category(char)[0] in "LMN" else " " for char in text)
+    spaced = "".join(
+        char if unicodedata.category(char)[0] in "LMN" else " " for char in text
+    )
     return set(spaced.split())
 
 
-def suggest_mapping(source_fields: Iterable[str], target_fields: Iterable[str]) -> list[dict[str, Any]]:
+def suggest_mapping(
+    source_fields: Iterable[str], target_fields: Iterable[str]
+) -> list[dict[str, Any]]:
     """Suggest one target field per source field with explainable confidence."""
 
     targets = list(target_fields)
@@ -119,11 +128,14 @@ def suggest_mapping(source_fields: Iterable[str], target_fields: Iterable[str]) 
             if source_norm and source_norm == target_norm:
                 candidate = (1.0, target, "exact normalized name")
             else:
-                sequence = difflib.SequenceMatcher(None, source_norm, target_norm).ratio()
+                sequence = difflib.SequenceMatcher(
+                    None, source_norm, target_norm
+                ).ratio()
                 source_tokens = _token_set(source)
                 target_tokens = _token_set(target)
                 overlap = (
-                    len(source_tokens & target_tokens) / len(source_tokens | target_tokens)
+                    len(source_tokens & target_tokens)
+                    / len(source_tokens | target_tokens)
                     if source_tokens and target_tokens
                     else 0.0
                 )
@@ -204,7 +216,9 @@ def _record(
     target_row_number: int | None = None,
     match_candidates: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    evidence_id = f"{status}:legacy-{legacy_row_number or 0}:target-{target_row_number or 0}"
+    evidence_id = (
+        f"{status}:legacy-{legacy_row_number or 0}:target-{target_row_number or 0}"
+    )
     return {
         "evidence_id": evidence_id,
         "status": status,
@@ -260,7 +274,9 @@ def reconcile(
         }
     resolved_mapping[legacy_key] = target_key
     comparison_mapping = {
-        source: target for source, target in resolved_mapping.items() if source != legacy_key
+        source: target
+        for source, target in resolved_mapping.items()
+        if source != legacy_key
     }
 
     legacy_index = _index_by_key(legacy_rows, legacy_key, selected_profile)
@@ -365,7 +381,10 @@ def reconcile(
                 find_fuzzy_candidates(
                     target_row,
                     legacy_rows,
-                    {target_field: legacy_field for legacy_field, target_field in comparison_mapping.items()},
+                    {
+                        target_field: legacy_field
+                        for legacy_field, target_field in comparison_mapping.items()
+                    },
                     selected_profile,
                     candidate_key=legacy_key,
                     threshold=fuzzy_threshold,
@@ -435,8 +454,12 @@ def _quote_identifier(identifier: str) -> str:
     """Quote a simple SQL identifier or schema-qualified identifier."""
 
     parts = identifier.split(".")
-    if not parts or any(not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part) for part in parts):
-        raise ValueError("SQL identifiers may contain letters, numbers, underscores and dots only")
+    if not parts or any(
+        not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", part) for part in parts
+    ):
+        raise ValueError(
+            "SQL identifiers may contain letters, numbers, underscores and dots only"
+        )
     return ".".join(f'"{part}"' for part in parts)
 
 
@@ -455,7 +478,9 @@ def _quote_column(identifier: str) -> str:
     if not isinstance(identifier, str) or not identifier.strip():
         raise ValueError("SQL column identifiers cannot be blank")
     if len(identifier) > _MAX_COLUMN_IDENTIFIER_CHARS:
-        raise ValueError(f"SQL column identifiers are limited to {_MAX_COLUMN_IDENTIFIER_CHARS} characters")
+        raise ValueError(
+            f"SQL column identifiers are limited to {_MAX_COLUMN_IDENTIFIER_CHARS} characters"
+        )
     if any(ord(char) < 32 or ord(char) == 127 for char in identifier):
         raise ValueError("SQL column identifiers cannot contain control characters")
     return '"' + identifier.replace('"', '""') + '"'

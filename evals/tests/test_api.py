@@ -19,12 +19,19 @@ except ImportError:  # pragma: no cover - fastapi/httpx are needed for API tests
 SAMPLE_DATA_ROOT = Path(str(files("migration_validation_api") / "sample_data"))
 
 
-def xlsx_with_cell(reference: str, *, in_data_row: bool = False, empty: bool = False) -> bytes:
-    cell = f'<c r="{reference}"/>' if empty else f'<c r="{reference}" t="inlineStr"><is><t>id</t></is></c>'
+def xlsx_with_cell(
+    reference: str, *, in_data_row: bool = False, empty: bool = False
+) -> bytes:
+    cell = (
+        f'<c r="{reference}"/>'
+        if empty
+        else f'<c r="{reference}" t="inlineStr"><is><t>id</t></is></c>'
+    )
     rows = (
         '<row r="1"><c r="A1" t="inlineStr"><is><t>id</t></is></c></row>'
         f'<row r="2">{cell}</row>'
-        if in_data_row else f'<row r="1">{cell}</row>'
+        if in_data_row
+        else f'<row r="1">{cell}</row>'
     )
     worksheet = (
         '<?xml version="1.0" encoding="UTF-8"?>'
@@ -67,24 +74,34 @@ class ApiTests(unittest.TestCase):
         self.assertIn("profiles", self.client.get("/api/normalization-profiles").json())
 
     def test_fixture_route_blocks_traversal(self) -> None:
-        self.assertEqual(self.client.get("/fixtures/legacy_customers.csv").status_code, 200)
+        self.assertEqual(
+            self.client.get("/fixtures/legacy_customers.csv").status_code, 200
+        )
         # server.py sits next to sample_data/, so these would leak real code.
-        for path in ("/fixtures/../server.py", "/fixtures/%2e%2e/server.py",
-                     "/fixtures/%2e%2e%2fserver.py", "/fixtures/../../../../pyproject.toml",
-                     "/fixtures/missing.csv"):
+        for path in (
+            "/fixtures/../server.py",
+            "/fixtures/%2e%2e/server.py",
+            "/fixtures/%2e%2e%2fserver.py",
+            "/fixtures/../../../../pyproject.toml",
+            "/fixtures/missing.csv",
+        ):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
 
     def test_sample_flow_is_served_from_package_data(self) -> None:
         from migration_validation_api import server
 
-        self.assertEqual(server.SAMPLE_DATA_ROOT.parent, Path(server.__file__).resolve().parent)
+        self.assertEqual(
+            server.SAMPLE_DATA_ROOT.parent, Path(server.__file__).resolve().parent
+        )
         for name in ("legacy_customers.csv", "new_customers.csv"):
             with self.subTest(name=name):
                 response = self.client.get(f"/fixtures/{name}")
                 self.assertEqual(response.status_code, 200)
                 self.assertTrue(response.headers["content-type"].startswith("text/csv"))
-                self.assertEqual(response.content, (server.SAMPLE_DATA_ROOT / name).read_bytes())
+                self.assertEqual(
+                    response.content, (server.SAMPLE_DATA_ROOT / name).read_bytes()
+                )
 
     def test_reconcile_with_spaced_and_thai_headers(self) -> None:
         response = self.client.post(
@@ -121,11 +138,41 @@ class ApiTests(unittest.TestCase):
 
     def test_bad_inputs_return_structured_errors(self) -> None:
         cases = [
-            ({"legacy_csv": "id\n1\n", "target_csv": "id\n1\n", "legacy_key": "nope", "target_key": "id"}, 400),
-            ({"legacy_file_base64": "***", "legacy_filename": "a.csv", "target_csv": "id\n1\n"}, 400),
-            ({"legacy_csv": "id\n1\n", "target_csv": "id\n1\n", "legacy_key": "id", "target_key": "id",
-              "legacy_table": "t;drop"}, 400),
-            ({"legacy_csv": "id\n1\n", "target_csv": "id\n1\n", "fuzzy_threshold": 2}, 422),
+            (
+                {
+                    "legacy_csv": "id\n1\n",
+                    "target_csv": "id\n1\n",
+                    "legacy_key": "nope",
+                    "target_key": "id",
+                },
+                400,
+            ),
+            (
+                {
+                    "legacy_file_base64": "***",
+                    "legacy_filename": "a.csv",
+                    "target_csv": "id\n1\n",
+                },
+                400,
+            ),
+            (
+                {
+                    "legacy_csv": "id\n1\n",
+                    "target_csv": "id\n1\n",
+                    "legacy_key": "id",
+                    "target_key": "id",
+                    "legacy_table": "t;drop",
+                },
+                400,
+            ),
+            (
+                {
+                    "legacy_csv": "id\n1\n",
+                    "target_csv": "id\n1\n",
+                    "fuzzy_threshold": 2,
+                },
+                422,
+            ),
         ]
         for payload, status in cases:
             with self.subTest(payload=payload):
@@ -139,29 +186,53 @@ class ApiTests(unittest.TestCase):
         with mock.patch.object(input_contract, "MAX_DATASET_ROWS", 1):
             reconcile = self.client.post(
                 "/api/reconcile",
-                json={"legacy_csv": "id\n1\n2\n", "target_csv": "id\n1\n", "legacy_key": "id", "target_key": "id"},
+                json={
+                    "legacy_csv": "id\n1\n2\n",
+                    "target_csv": "id\n1\n",
+                    "legacy_key": "id",
+                    "target_key": "id",
+                },
             )
             inspect = self.client.post(
                 "/api/inspect",
-                json={"filename": "a.csv", "content_base64": base64.b64encode(b"id\n1\n2\n").decode()},
+                json={
+                    "filename": "a.csv",
+                    "content_base64": base64.b64encode(b"id\n1\n2\n").decode(),
+                },
             )
         for response in (reconcile, inspect):
             self.assertEqual(response.status_code, 413)
             self.assertIn("row limit", response.json()["error"])
 
-    def test_sparse_xlsx_column_limit_returns_413_for_inspect_and_reconcile(self) -> None:
-        for reference, in_data_row, empty in (("SG1", False, False), ("XFD2", True, False), ("XFD2", True, True)):
-            encoded = base64.b64encode(xlsx_with_cell(reference, in_data_row=in_data_row, empty=empty)).decode()
+    def test_sparse_xlsx_column_limit_returns_413_for_inspect_and_reconcile(
+        self,
+    ) -> None:
+        for reference, in_data_row, empty in (
+            ("SG1", False, False),
+            ("XFD2", True, False),
+            ("XFD2", True, True),
+        ):
+            encoded = base64.b64encode(
+                xlsx_with_cell(reference, in_data_row=in_data_row, empty=empty)
+            ).decode()
             with self.subTest(reference=reference, empty=empty):
-                inspect = self.client.post("/api/inspect", json={"filename": "sparse.xlsx", "content_base64": encoded})
+                inspect = self.client.post(
+                    "/api/inspect",
+                    json={"filename": "sparse.xlsx", "content_base64": encoded},
+                )
                 self.assertEqual(inspect.status_code, 413, inspect.text)
                 self.assertIn("500 column limit", inspect.json()["error"])
                 for side in ("legacy", "target"):
                     other = "target" if side == "legacy" else "legacy"
                     reconcile = self.client.post(
                         "/api/reconcile",
-                        json={f"{side}_file_base64": encoded, f"{side}_filename": "sparse.xlsx",
-                              f"{other}_csv": "id\n1\n", "legacy_key": "id", "target_key": "id"},
+                        json={
+                            f"{side}_file_base64": encoded,
+                            f"{side}_filename": "sparse.xlsx",
+                            f"{other}_csv": "id\n1\n",
+                            "legacy_key": "id",
+                            "target_key": "id",
+                        },
                     )
                     self.assertEqual(reconcile.status_code, 413, reconcile.text)
                     self.assertIn("500 column limit", reconcile.json()["error"])
@@ -170,8 +241,16 @@ class ApiTests(unittest.TestCase):
         encoded = base64.b64encode(xlsx_with_cell("XFE1")).decode()
         for endpoint, payload in (
             ("/api/inspect", {"filename": "invalid.xlsx", "content_base64": encoded}),
-            ("/api/reconcile", {"legacy_file_base64": encoded, "legacy_filename": "invalid.xlsx",
-                                "target_csv": "id\n1\n", "legacy_key": "id", "target_key": "id"}),
+            (
+                "/api/reconcile",
+                {
+                    "legacy_file_base64": encoded,
+                    "legacy_filename": "invalid.xlsx",
+                    "target_csv": "id\n1\n",
+                    "legacy_key": "id",
+                    "target_key": "id",
+                },
+            ),
         ):
             with self.subTest(endpoint=endpoint):
                 response = self.client.post(endpoint, json=payload)
@@ -180,14 +259,21 @@ class ApiTests(unittest.TestCase):
 
     def test_legitimate_xlsx_still_inspects_and_reconciles(self) -> None:
         encoded = base64.b64encode(xlsx_with_cell("A2", in_data_row=True)).decode()
-        inspect = self.client.post("/api/inspect", json={"filename": "valid.xlsx", "content_base64": encoded})
+        inspect = self.client.post(
+            "/api/inspect", json={"filename": "valid.xlsx", "content_base64": encoded}
+        )
         self.assertEqual(inspect.status_code, 200, inspect.text)
         self.assertEqual(inspect.json()["input"]["row_count"], 1)
         reconcile = self.client.post(
             "/api/reconcile",
-            json={"legacy_file_base64": encoded, "legacy_filename": "valid.xlsx",
-                  "target_file_base64": encoded, "target_filename": "valid.xlsx",
-                  "legacy_key": "id", "target_key": "id"},
+            json={
+                "legacy_file_base64": encoded,
+                "legacy_filename": "valid.xlsx",
+                "target_file_base64": encoded,
+                "target_filename": "valid.xlsx",
+                "legacy_key": "id",
+                "target_key": "id",
+            },
         )
         self.assertEqual(reconcile.status_code, 200, reconcile.text)
         self.assertEqual(reconcile.json()["summary"]["matched"], 1)
@@ -202,34 +288,57 @@ class ApiTests(unittest.TestCase):
         names = {entry.name: entry.value for entry in scripts}
         if "migration-workbench" not in names:
             self.skipTest("project is not installed (pip install -e .)")
-        self.assertEqual(names["migration-workbench"], "migration_validation_api.cli:main")
+        self.assertEqual(
+            names["migration-workbench"], "migration_validation_api.cli:main"
+        )
 
     def test_inspect_strips_directory_parts_from_filenames(self) -> None:
         response = self.client.post(
             "/api/inspect",
-            json={"filename": "../../etc/passwd.csv", "content_base64": base64.b64encode(b"id\n1\n").decode()},
+            json={
+                "filename": "../../etc/passwd.csv",
+                "content_base64": base64.b64encode(b"id\n1\n").decode(),
+            },
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("..", str(response.json()["input"]))
-        bad = self.client.post("/api/inspect", json={"filename": "..", "content_base64": "aWQK"})
+        bad = self.client.post(
+            "/api/inspect", json={"filename": "..", "content_base64": "aWQK"}
+        )
         self.assertEqual(bad.status_code, 400)
 
     def test_size_guard(self) -> None:
         response = self.client.post(
-            "/api/inspect", content=b"{}",
-            headers={"Content-Type": "application/json", "Content-Length": str(MAX_BODY_BYTES + 1)},
+            "/api/inspect",
+            content=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": str(MAX_BODY_BYTES + 1),
+            },
         )
         self.assertEqual(response.status_code, 413)
 
     def test_cors_allows_only_local_origins(self) -> None:
         allowed = self.client.options(
-            "/api/health", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"}
+            "/api/health",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "GET",
+            },
         )
-        self.assertEqual(allowed.headers.get("access-control-allow-origin"), "http://localhost:3000")
+        self.assertEqual(
+            allowed.headers.get("access-control-allow-origin"), "http://localhost:3000"
+        )
         denied = self.client.options(
-            "/api/health", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"}
+            "/api/health",
+            headers={
+                "Origin": "https://evil.example",
+                "Access-Control-Request-Method": "GET",
+            },
         )
-        self.assertNotEqual(denied.headers.get("access-control-allow-origin"), "https://evil.example")
+        self.assertNotEqual(
+            denied.headers.get("access-control-allow-origin"), "https://evil.example"
+        )
 
 
 if __name__ == "__main__":

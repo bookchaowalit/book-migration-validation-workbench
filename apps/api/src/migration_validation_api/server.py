@@ -24,7 +24,10 @@ from migration_input.input_contract import (
     read_dataset_bytes,
 )
 from migration_privacy.redaction import redact_result
-from reconciliation_core.fuzzy import DEFAULT_FUZZY_CANDIDATE_LIMIT, DEFAULT_FUZZY_THRESHOLD
+from reconciliation_core.fuzzy import (
+    DEFAULT_FUZZY_CANDIDATE_LIMIT,
+    DEFAULT_FUZZY_THRESHOLD,
+)
 from reconciliation_core.normalization import available_profiles
 from reconciliation_core.reconcile import generate_sql, reconcile
 
@@ -67,7 +70,9 @@ class ReconcilePayload(BaseModel):
     review_statuses: dict[str, str] = Field(default_factory=dict)
     fuzzy_enabled: bool = True
     fuzzy_threshold: float = Field(default=DEFAULT_FUZZY_THRESHOLD, ge=0.0, le=1.0)
-    fuzzy_candidate_limit: int = Field(default=DEFAULT_FUZZY_CANDIDATE_LIMIT, ge=1, le=5)
+    fuzzy_candidate_limit: int = Field(
+        default=DEFAULT_FUZZY_CANDIDATE_LIMIT, ge=1, le=5
+    )
 
 
 app = FastAPI(
@@ -97,7 +102,10 @@ app.add_middleware(
 async def request_size_guard(request: Request, call_next):
     """Reject oversized upload requests before FastAPI parses their JSON body."""
 
-    if request.method == "POST" and request.url.path in {"/api/inspect", "/api/reconcile"}:
+    if request.method == "POST" and request.url.path in {
+        "/api/inspect",
+        "/api/reconcile",
+    }:
         content_length = request.headers.get("content-length")
         try:
             length = int(content_length or "0")
@@ -112,9 +120,13 @@ async def request_size_guard(request: Request, call_next):
 
 
 @app.exception_handler(RequestValidationError)
-async def request_validation_error_handler(_request: Request, exc: RequestValidationError):
+async def request_validation_error_handler(
+    _request: Request, exc: RequestValidationError
+):
     first_error = exc.errors()[0] if exc.errors() else {"msg": "Invalid request"}
-    location = ".".join(str(part) for part in first_error.get("loc", []) if part != "body")
+    location = ".".join(
+        str(part) for part in first_error.get("loc", []) if part != "body"
+    )
     message = first_error.get("msg", "Invalid request")
     return JSONResponse(
         {"error": f"{location}: {message}" if location else message},
@@ -138,7 +150,11 @@ async def root() -> dict[str, str]:
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "service": "migration-validation-workbench", "version": app.version}
+    return {
+        "status": "ok",
+        "service": "migration-validation-workbench",
+        "version": app.version,
+    }
 
 
 @app.get("/api/normalization-profiles")
@@ -155,7 +171,11 @@ async def fixture(fixture_path: str):
     fixture_root = FIXTURE_ROOT.resolve()
     if not resolved.is_relative_to(fixture_root) or not resolved.is_file():
         return JSONResponse({"error": "Not found"}, status_code=404)
-    media_type = "text/csv" if resolved.suffix.casefold() in {".csv", ".tsv"} else "application/octet-stream"
+    media_type = (
+        "text/csv"
+        if resolved.suffix.casefold() in {".csv", ".tsv"}
+        else "application/octet-stream"
+    )
     return FileResponse(resolved, media_type=media_type)
 
 
@@ -169,7 +189,9 @@ async def inspect(payload: InspectPayload) -> dict[str, Any]:
 
 
 @app.post("/api/reconcile", response_model=None)
-async def reconcile_endpoint(payload: ReconcilePayload) -> dict[str, Any] | JSONResponse:
+async def reconcile_endpoint(
+    payload: ReconcilePayload,
+) -> dict[str, Any] | JSONResponse:
     try:
         legacy = _dataset_from_request(payload, "legacy")
         target = _dataset_from_request(payload, "target")
@@ -238,8 +260,12 @@ async def reconcile_endpoint(payload: ReconcilePayload) -> dict[str, Any] | JSON
 
 
 def _dataset_from_file_payload(payload: BaseModel, prefix: str) -> CanonicalDataset:
-    filename = getattr(payload, f"{prefix}_filename", None) or getattr(payload, "filename", "")
-    encoded = getattr(payload, f"{prefix}_file_base64", None) or getattr(payload, "content_base64", "")
+    filename = getattr(payload, f"{prefix}_filename", None) or getattr(
+        payload, "filename", ""
+    )
+    encoded = getattr(payload, f"{prefix}_file_base64", None) or getattr(
+        payload, "content_base64", ""
+    )
     return read_dataset_bytes(decode_base64_payload(encoded), str(filename))
 
 

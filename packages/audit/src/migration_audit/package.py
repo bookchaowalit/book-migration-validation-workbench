@@ -84,7 +84,13 @@ def _evidence_reference(item: Mapping[str, Any]) -> dict[str, Any]:
         reference["match_candidates"].append(
             {
                 key: candidate[key]
-                for key in ("row_number", "score", "threshold", "auto_approved", "reason")
+                for key in (
+                    "row_number",
+                    "score",
+                    "threshold",
+                    "auto_approved",
+                    "reason",
+                )
                 if key in candidate
             }
             | {"field_scores": _field_scores(candidate)}

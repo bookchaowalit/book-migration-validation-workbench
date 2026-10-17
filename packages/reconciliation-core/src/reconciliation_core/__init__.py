@@ -7,7 +7,12 @@ from .fuzzy import (
     find_fuzzy_candidates,
     fuzzy_score,
 )
-from .normalization import available_profiles, canonical_profile, normalize_value, profile_metadata
+from .normalization import (
+    available_profiles,
+    canonical_profile,
+    normalize_value,
+    profile_metadata,
+)
 
 __version__ = "0.2.0"
 

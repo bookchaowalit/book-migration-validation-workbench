@@ -32,7 +32,9 @@ class SqlGenerationTests(unittest.TestCase):
             with self.subTest(table=bad):
                 with self.assertRaisesRegex(ValueError, "identifiers"):
                     generate_sql(bad, "target", "id", "id", {})
-        self.assertIn('"main"."legacy"', generate_sql("main.legacy", "target", "id", "id", {}))
+        self.assertIn(
+            '"main"."legacy"', generate_sql("main.legacy", "target", "id", "id", {})
+        )
 
     def test_blank_long_or_control_column_names_are_rejected(self) -> None:
         for bad in ("", "   ", "a\nb", "a\x00b", "c" * 129):
@@ -43,15 +45,22 @@ class SqlGenerationTests(unittest.TestCase):
     @unittest.skipIf(duckdb is None, "duckdb not installed")
     def test_generated_sql_executes_and_finds_differences(self) -> None:
         con = duckdb.connect()
-        con.execute('CREATE TABLE legacy ("Account No" VARCHAR, "Customer ""Name""" VARCHAR)')
+        con.execute(
+            'CREATE TABLE legacy ("Account No" VARCHAR, "Customer ""Name""" VARCHAR)'
+        )
         con.execute('CREATE TABLE target ("เลขบัญชี" VARCHAR, "name" VARCHAR)')
         con.execute("INSERT INTO legacy VALUES ('1', 'a'), ('2', 'b'), ('3', 'c')")
         con.execute("INSERT INTO target VALUES ('1', 'a'), ('2', 'B'), ('4', 'd')")
         sql = generate_sql(
-            "legacy", "target", "Account No", "เลขบัญชี",
+            "legacy",
+            "target",
+            "Account No",
+            "เลขบัญชี",
             {"Account No": "เลขบัญชี", 'Customer "Name"': "name"},
         )
-        rows = sorted(con.execute(sql).fetchall(), key=lambda row: (row[0] or "", row[1] or ""))
+        rows = sorted(
+            con.execute(sql).fetchall(), key=lambda row: (row[0] or "", row[1] or "")
+        )
         self.assertEqual(rows, [(None, "4"), ("2", "2"), ("3", None)])
 
 

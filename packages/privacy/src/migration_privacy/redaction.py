@@ -24,7 +24,10 @@ def default_redact_fields(fields: Iterable[str]) -> set[str]:
     return {
         field
         for field in fields
-        if any(token in field.casefold().replace("-", "_") for token in DEFAULT_SENSITIVE_TOKENS)
+        if any(
+            token in field.casefold().replace("-", "_")
+            for token in DEFAULT_SENSITIVE_TOKENS
+        )
     }
 
 
@@ -63,7 +66,10 @@ def redact_result(
             if isinstance(candidate, dict):
                 candidate_fields = {
                     field
-                    for field in (candidate.get("candidate_field"), candidate.get("target_field"))
+                    for field in (
+                        candidate.get("candidate_field"),
+                        candidate.get("target_field"),
+                    )
                     if field
                 }
                 for field_score in candidate.get("field_scores", []):

@@ -33,7 +33,7 @@ def minimal_xlsx() -> bytes:
 def xlsx_from_rows(*rows: str) -> bytes:
     worksheet = (
         '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-        f'<sheetData>{"".join(rows)}</sheetData></worksheet>'
+        f"<sheetData>{''.join(rows)}</sheetData></worksheet>"
     )
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -67,7 +67,9 @@ class InputContractTests(unittest.TestCase):
 
         self.assertEqual(dataset.source_format, "xlsx")
         self.assertEqual(dataset.fields, ["account_no", "customer_name"])
-        self.assertEqual(dataset.rows, [{"account_no": "A-001", "customer_name": "สมชาย ทดสอบ"}])
+        self.assertEqual(
+            dataset.rows, [{"account_no": "A-001", "customer_name": "สมชาย ทดสอบ"}]
+        )
 
     def test_tsv_and_invalid_format_behavior_are_explicit(self) -> None:
         dataset = read_dataset_bytes(b"id\tvalue\n1\tok\n", "records.tsv")
@@ -81,9 +83,13 @@ class InputContractTests(unittest.TestCase):
         first = configuration_fingerprint({"mapping": {"a": "b"}, "key": "id"})
         second = configuration_fingerprint({"key": "id", "mapping": {"a": "b"}})
         self.assertEqual(first, second)
-        self.assertNotEqual(first, configuration_fingerprint({"key": "other", "mapping": {"a": "b"}}))
+        self.assertNotEqual(
+            first, configuration_fingerprint({"key": "other", "mapping": {"a": "b"}})
+        )
 
-    @unittest.skipUnless(__import__("importlib").util.find_spec("pyarrow"), "PyArrow is optional")
+    @unittest.skipUnless(
+        __import__("importlib").util.find_spec("pyarrow"), "PyArrow is optional"
+    )
     def test_parquet_is_supported_when_optional_runtime_is_available(self) -> None:
         import pyarrow as pa
         import pyarrow.parquet as parquet
@@ -131,25 +137,35 @@ class DatasetShapeLimitTests(unittest.TestCase):
 
     def test_xlsx_column_limit_is_checked_before_dense_allocation(self) -> None:
         def guarded_range(width: int) -> range:
-            self.assertLessEqual(width, 500, "Oversized XLSX row expanded before rejection")
+            self.assertLessEqual(
+                width, 500, "Oversized XLSX row expanded before rejection"
+            )
             return range(width)
 
         header = '<row r="1"><c r="A1" t="inlineStr"><is><t>id</t></is></c></row>'
         values = (
             't="inlineStr"><is><t>value</t></is>',
             't="b"><v>1</v>',
-            '><v>7</v>',
+            "><v>7</v>",
             't="s"><v>999</v>',
-            '>',
+            ">",
         )
         for column in ("SG", "XFD"):
             for row_number in (1, 2):
                 for cell_value in values:
-                    with self.subTest(column=column, row=row_number, cell_value=cell_value):
+                    with self.subTest(
+                        column=column, row=row_number, cell_value=cell_value
+                    ):
                         row = f'<row r="{row_number}"><c r="{column}{row_number}" {cell_value}</c></row>'
-                        payload = xlsx_from_rows(*([header, row] if row_number == 2 else [row]))
-                        with mock.patch.object(input_contract, "range", guarded_range, create=True):
-                            with self.assertRaisesRegex(DatasetTooLarge, "500 column limit"):
+                        payload = xlsx_from_rows(
+                            *([header, row] if row_number == 2 else [row])
+                        )
+                        with mock.patch.object(
+                            input_contract, "range", guarded_range, create=True
+                        ):
+                            with self.assertRaisesRegex(
+                                DatasetTooLarge, "500 column limit"
+                            ):
                                 read_dataset_bytes(payload, "sparse.xlsx")
 
     def test_xlsx_accepts_exactly_500_columns_with_normal_cell_types(self) -> None:

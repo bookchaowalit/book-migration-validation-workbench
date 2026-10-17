@@ -13,7 +13,10 @@ from reconciliation_core.reconcile import read_csv_text, reconcile
 
 
 def main() -> None:
-    fixtures = Path(__file__).resolve().parents[1] / "apps/api/src/migration_validation_api/sample_data"
+    fixtures = (
+        Path(__file__).resolve().parents[1]
+        / "apps/api/src/migration_validation_api/sample_data"
+    )
     inputs = {}
     datasets = []
     for name in ("thai_customers_legacy.csv", "thai_customers_target.csv"):
@@ -25,8 +28,15 @@ def main() -> None:
 
     def run(profile, reviews=None):
         return reconcile(
-            legacy_fields, legacy, target_fields, target,
-            "account_no", "account_no", mapping, profile, reviews,
+            legacy_fields,
+            legacy,
+            target_fields,
+            target,
+            "account_no",
+            "account_no",
+            mapping,
+            profile,
+            reviews,
         )
 
     generic = run("generic")
@@ -45,9 +55,16 @@ def main() -> None:
     # A simulated decision is deliberately Needs review, never human approval.
     evidence_id = evidence["TH-002"]["evidence_id"]
     reviewed = run("thai_customer", {evidence_id: "needs-review"})
-    assert next(item for item in reviewed["evidence"] if item["evidence_id"] == evidence_id)["review_status"] == "needs-review"
+    assert (
+        next(
+            item for item in reviewed["evidence"] if item["evidence_id"] == evidence_id
+        )["review_status"]
+        == "needs-review"
+    )
     redacted = redact_result(
-        reviewed, legacy_key="account_no", target_key="account_no",
+        reviewed,
+        legacy_key="account_no",
+        target_key="account_no",
         fields=("account_no", "customer_name", "phone"),
     )
     for item in redacted["evidence"]:
@@ -56,15 +73,26 @@ def main() -> None:
             for field in ("account_no", "customer_name", "phone"):
                 assert item[side][field] == REDACTED
     assert evidence["TH-002"]["legacy"]["customer_name"] == "สุดา ตัวอย่าง"
-    print(json.dumps({
-        "mode": "AI-assisted synthetic dry run",
-        "human_operator_completion": False,
-        "inputs_sha256": inputs,
-        "generic_summary": generic["summary"],
-        "thai_summary": thai["summary"],
-        "checks": ["raw evidence preserved", "name mismatch remains", "review survives rerun", "selected evidence fields redacted"],
-        "result": "passed",
-    }, ensure_ascii=False, indent=2))
+    print(
+        json.dumps(
+            {
+                "mode": "AI-assisted synthetic dry run",
+                "human_operator_completion": False,
+                "inputs_sha256": inputs,
+                "generic_summary": generic["summary"],
+                "thai_summary": thai["summary"],
+                "checks": [
+                    "raw evidence preserved",
+                    "name mismatch remains",
+                    "review survives rerun",
+                    "selected evidence fields redacted",
+                ],
+                "result": "passed",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
