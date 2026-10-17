@@ -49,14 +49,8 @@ def _duckdb_profile(
 
     connection = duckdb.connect(":memory:")  # type: ignore[union-attr]
     try:
-        placeholders = ", ".join(
-            f"({', '.join('?' for _ in fields)})" for _ in rows
-        )
-        values = [
-            str(row.get(field, ""))
-            for row in rows
-            for field in fields
-        ]
+        placeholders = ", ".join(f"({', '.join('?' for _ in fields)})" for _ in rows)
+        values = [str(row.get(field, "")) for row in rows for field in fields]
         columns = ", ".join(f'"col{index}"' for index in range(len(fields)))
         select_parts = ["COUNT(*) AS row_count"]
         select_parts.extend(
@@ -76,10 +70,11 @@ def _duckdb_profile(
         assert result is not None
         row_count = int(result[0])
         blank_counts = {
-            field: int(result[index + 1] or 0)
-            for index, field in enumerate(fields)
+            field: int(result[index + 1] or 0) for index, field in enumerate(fields)
         }
-        distinct_keys = int(result[len(fields) + 1] or 0) if key_index is not None else 0
+        distinct_keys = (
+            int(result[len(fields) + 1] or 0) if key_index is not None else 0
+        )
         return {
             "backend": "duckdb",
             "row_count": row_count,
@@ -87,7 +82,9 @@ def _duckdb_profile(
             "blank_counts": blank_counts,
             "key_field": key_field,
             "distinct_keys": distinct_keys,
-            "duplicate_key_rows": max(0, row_count - distinct_keys) if key_index is not None else 0,
+            "duplicate_key_rows": max(0, row_count - distinct_keys)
+            if key_index is not None
+            else 0,
         }
     finally:
         connection.close()
@@ -104,6 +101,6 @@ def profile_dataset(
         return _python_profile(fields, rows, key_field, "python-fallback-large-inline")
     try:
         return _duckdb_profile(fields, rows, key_field)
-    except Exception:
+    except Exception:  # noqa: BLE001 - DuckDB is an optimization; any engine error falls back to the Python profile
         # DuckDB is an optimization boundary, not a reason to reject valid input.
         return _python_profile(fields, rows, key_field, "python-fallback-engine-error")

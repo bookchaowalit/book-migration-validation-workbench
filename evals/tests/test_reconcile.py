@@ -41,22 +41,30 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(result["summary"]["counts"]["missing_target"], 1)
         self.assertEqual(result["summary"]["counts"]["duplicate"], 2)
         self.assertEqual(result["summary"]["counts"]["missing_legacy"], 1)
-        mismatch = next(item for item in result["evidence"] if item["status"] == "value_mismatch")
+        mismatch = next(
+            item for item in result["evidence"] if item["status"] == "value_mismatch"
+        )
         self.assertEqual(mismatch["key"], "A-002")
         self.assertEqual(mismatch["mismatches"][0]["legacy_field"], "status")
 
     def test_blank_key_is_not_silently_dropped(self) -> None:
         fields, rows = read_csv_text("id,value\n,orphan\n")
         target_fields, target_rows = read_csv_text("id,value\n1,ok\n")
-        result = reconcile(fields, rows, target_fields, target_rows, "id", "id", {"id": "id"})
+        result = reconcile(
+            fields, rows, target_fields, target_rows, "id", "id", {"id": "id"}
+        )
         self.assertEqual(result["summary"]["counts"]["invalid_key"], 1)
         self.assertEqual(result["evidence"][0]["reason"], "Legacy key 'id' is blank")
 
     def test_mapping_suggestions_are_bounded(self) -> None:
-        suggestions = suggest_mapping(["close_date", "customer_name"], ["closed_at", "customer_name"])
+        suggestions = suggest_mapping(
+            ["close_date", "customer_name"], ["closed_at", "customer_name"]
+        )
         self.assertEqual(suggestions[1]["target"], "customer_name")
         self.assertTrue(0 <= suggestions[0]["confidence"] <= 1)
-        self.assertIn(suggestions[0]["method"], {"similar name", "exact normalized name"})
+        self.assertIn(
+            suggestions[0]["method"], {"similar name", "exact normalized name"}
+        )
 
     def test_duplicate_headers_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "headers must be unique"):
@@ -76,22 +84,28 @@ class ReconciliationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identifiers"):
             generate_sql("legacy;drop", "target", "id", "id", {"id": "id"})
 
-    def test_thai_customer_profile_normalizes_values_but_preserves_raw_evidence(self) -> None:
+    def test_thai_customer_profile_normalizes_values_but_preserves_raw_evidence(
+        self,
+    ) -> None:
         fields = ["account_no", "customer_name", "phone", "tax_id", "closed_date"]
-        legacy_rows = [{
-            "account_no": " 001 ",
-            "customer_name": "นาย สมชาย",
-            "phone": "+66 81-234-5678",
-            "tax_id": "1-2345-67890-12-3",
-            "closed_date": "17/04/2566",
-        }]
-        target_rows = [{
-            "account_no": "001",
-            "customer_name": "สมชาย",
-            "phone": "0812345678",
-            "tax_id": "1234567890123",
-            "closed_date": "2023-04-17",
-        }]
+        legacy_rows = [
+            {
+                "account_no": " 001 ",
+                "customer_name": "นาย สมชาย",
+                "phone": "+66 81-234-5678",
+                "tax_id": "1-2345-67890-12-3",
+                "closed_date": "17/04/2566",
+            }
+        ]
+        target_rows = [
+            {
+                "account_no": "001",
+                "customer_name": "สมชาย",
+                "phone": "0812345678",
+                "tax_id": "1234567890123",
+                "closed_date": "2023-04-17",
+            }
+        ]
 
         result = reconcile(
             fields,
@@ -171,9 +185,27 @@ class ReconciliationTests(unittest.TestCase):
         self.assertLess(strict_candidate["score"], 1.0)
         self.assertIn("Below conservative review threshold", strict_candidate["reason"])
         with self.assertRaisesRegex(ValueError, "fuzzy_threshold"):
-            reconcile(fields, [{"legacy_id": "1"}], ["target_id"], [{"target_id": "2"}], "legacy_id", "target_id", {}, fuzzy_threshold=1.1)
+            reconcile(
+                fields,
+                [{"legacy_id": "1"}],
+                ["target_id"],
+                [{"target_id": "2"}],
+                "legacy_id",
+                "target_id",
+                {},
+                fuzzy_threshold=1.1,
+            )
         with self.assertRaisesRegex(ValueError, "fuzzy_candidate_limit"):
-            reconcile(fields, [{"legacy_id": "1"}], ["target_id"], [{"target_id": "2"}], "legacy_id", "target_id", {}, fuzzy_candidate_limit=6)
+            reconcile(
+                fields,
+                [{"legacy_id": "1"}],
+                ["target_id"],
+                [{"target_id": "2"}],
+                "legacy_id",
+                "target_id",
+                {},
+                fuzzy_candidate_limit=6,
+            )
 
     def test_fuzzy_candidates_are_symmetric_for_target_only_records(self) -> None:
         result = reconcile(
@@ -186,7 +218,9 @@ class ReconciliationTests(unittest.TestCase):
             {"customer_name": "customer_name", "status": "status"},
         )
 
-        target_only = next(item for item in result["evidence"] if item["status"] == "missing_legacy")
+        target_only = next(
+            item for item in result["evidence"] if item["status"] == "missing_legacy"
+        )
         self.assertEqual(target_only["match_candidates"][0]["candidate_key"], "OLD-9")
         self.assertFalse(target_only["match_candidates"][0]["auto_approved"])
 
@@ -218,9 +252,17 @@ class ReconciliationTests(unittest.TestCase):
         self.assertEqual(reviewed["review_summary"]["approved"], 1)
         with self.assertRaisesRegex(ValueError, "Unknown review status"):
             reconcile(
-                ["id"], [{"id": "1"}], ["id"], [{"id": "1"}],
-                "id", "id", None, "generic", {evidence_id: "maybe"},
+                ["id"],
+                [{"id": "1"}],
+                ["id"],
+                [{"id": "1"}],
+                "id",
+                "id",
+                None,
+                "generic",
+                {evidence_id: "maybe"},
             )
+
 
 class UnicodeHeaderAndRateTests(unittest.TestCase):
     def test_thai_headers_are_distinct_and_map_exactly(self) -> None:

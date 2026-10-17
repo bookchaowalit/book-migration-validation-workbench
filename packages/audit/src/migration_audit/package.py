@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Mapping
-
+from collections.abc import Mapping
+from typing import Any
 
 AUDIT_SCHEMA_VERSION = "mvw.audit.v1"
 RULE_VERSION = "reconciliation-core@0.2.0"
@@ -84,7 +84,13 @@ def _evidence_reference(item: Mapping[str, Any]) -> dict[str, Any]:
         reference["match_candidates"].append(
             {
                 key: candidate[key]
-                for key in ("row_number", "score", "threshold", "auto_approved", "reason")
+                for key in (
+                    "row_number",
+                    "score",
+                    "threshold",
+                    "auto_approved",
+                    "reason",
+                )
                 if key in candidate
             }
             | {"field_scores": _field_scores(candidate)}

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from difflib import SequenceMatcher
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .normalization import normalize_value
-
 
 DEFAULT_FUZZY_THRESHOLD = 0.90
 DEFAULT_FUZZY_CANDIDATE_LIMIT = 3
@@ -67,10 +67,16 @@ def find_fuzzy_candidates(
         if not field_scores:
             continue
 
-        score = round(sum(item["score"] for item in field_scores) / len(field_scores), 2)
+        score = round(
+            sum(item["score"] for item in field_scores) / len(field_scores), 2
+        )
         if score < minimum_score:
             continue
-        raw_candidate_key = "" if row.get(candidate_key) is None else str(row.get(candidate_key)).strip()
+        raw_candidate_key = (
+            ""
+            if row.get(candidate_key) is None
+            else str(row.get(candidate_key)).strip()
+        )
         candidates.append(
             {
                 # target_key is kept for the V1 response contract. candidate_key
@@ -90,5 +96,7 @@ def find_fuzzy_candidates(
             }
         )
 
-    candidates.sort(key=lambda item: (-item["score"], item["row_number"], item["candidate_key"]))
+    candidates.sort(
+        key=lambda item: (-item["score"], item["row_number"], item["candidate_key"])
+    )
     return candidates[:limit]

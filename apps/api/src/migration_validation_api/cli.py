@@ -21,7 +21,9 @@ def main(argv: list[str] | None = None) -> None:
         # The workbench has no access control (deploy/README.md): uploads and
         # reconciliation results must stay on this machine unless the operator
         # opts in explicitly.
-        parser.error(f"--host {args.host} is not loopback; the API is unauthenticated (pass --allow-remote to bind it)")
+        parser.error(
+            f"--host {args.host} is not loopback; the API is unauthenticated (pass --allow-remote to bind it)"
+        )
 
     import uvicorn
 

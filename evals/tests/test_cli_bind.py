@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 import uvicorn
-
 from migration_validation_api import cli
 
 

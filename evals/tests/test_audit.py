@@ -27,7 +27,10 @@ class AuditPackageTests(unittest.TestCase):
                     "legacy_row": 3,
                     "target_row": 7,
                     "legacy": {"account_no": "SECRET-ACCOUNT-42", "name": "Alice Raw"},
-                    "target": {"account_no": "SECRET-ACCOUNT-42", "name": "Alice Changed"},
+                    "target": {
+                        "account_no": "SECRET-ACCOUNT-42",
+                        "name": "Alice Changed",
+                    },
                     "mismatches": [
                         {
                             "legacy_field": "name",
@@ -44,7 +47,13 @@ class AuditPackageTests(unittest.TestCase):
                             "threshold": 0.9,
                             "auto_approved": False,
                             "reason": "Human review required",
-                            "field_scores": [{"source_field": "name", "candidate_field": "name", "score": 0.91}],
+                            "field_scores": [
+                                {
+                                    "source_field": "name",
+                                    "candidate_field": "name",
+                                    "score": 0.91,
+                                }
+                            ],
                         }
                     ],
                 }
@@ -63,7 +72,11 @@ class AuditPackageTests(unittest.TestCase):
         package = build_audit_package(
             result,
             legacy_metadata=inputs,
-            target_metadata={**inputs, "filename": "target.csv", "sha256": "target-hash"},
+            target_metadata={
+                **inputs,
+                "filename": "target.csv",
+                "sha256": "target-hash",
+            },
             legacy_key="account_no",
             target_key="account_no",
             legacy_table="legacy_customers",
@@ -76,12 +89,22 @@ class AuditPackageTests(unittest.TestCase):
         self.assertEqual(package["schema_version"], "mvw.audit.v1")
         self.assertEqual(package["rule_version"], "reconciliation-core@0.2.0")
         self.assertEqual(package["inputs"]["legacy"]["sha256"], "legacy-hash")
-        self.assertEqual(package["fingerprints"]["configuration_sha256"], "configuration-hash")
+        self.assertEqual(
+            package["fingerprints"]["configuration_sha256"], "configuration-hash"
+        )
         self.assertEqual(package["evidence"][0]["legacy_row"], 3)
         self.assertEqual(package["evidence"][0]["target_row"], 7)
-        self.assertEqual(package["evidence"][0]["mismatch_fields"], [{"legacy_field": "name", "target_field": "name"}])
+        self.assertEqual(
+            package["evidence"][0]["mismatch_fields"],
+            [{"legacy_field": "name", "target_field": "name"}],
+        )
         self.assertFalse(package["privacy"]["raw_values_included"])
-        for raw_value in ("SECRET-ACCOUNT-42", "SECRET-ACCOUNT-43", "Alice Raw", "Alice Changed"):
+        for raw_value in (
+            "SECRET-ACCOUNT-42",
+            "SECRET-ACCOUNT-43",
+            "Alice Raw",
+            "Alice Changed",
+        ):
             self.assertNotIn(raw_value, encoded)
         self.assertNotIn("legacy", package["evidence"][0])
         self.assertNotIn("target", package["evidence"][0])
@@ -89,7 +112,11 @@ class AuditPackageTests(unittest.TestCase):
         repeat = build_audit_package(
             result,
             legacy_metadata=inputs,
-            target_metadata={**inputs, "filename": "target.csv", "sha256": "target-hash"},
+            target_metadata={
+                **inputs,
+                "filename": "target.csv",
+                "sha256": "target-hash",
+            },
             legacy_key="account_no",
             target_key="account_no",
             legacy_table="legacy_customers",
