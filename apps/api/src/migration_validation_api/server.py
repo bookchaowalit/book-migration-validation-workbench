@@ -11,10 +11,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
-
-from migration_data_engine import profile_dataset
 from migration_audit import build_audit_package
+from migration_data_engine import profile_dataset
 from migration_input.input_contract import (
     CanonicalDataset,
     DatasetInputError,
@@ -24,13 +22,13 @@ from migration_input.input_contract import (
     read_dataset_bytes,
 )
 from migration_privacy.redaction import redact_result
+from pydantic import BaseModel, Field
 from reconciliation_core.fuzzy import (
     DEFAULT_FUZZY_CANDIDATE_LIMIT,
     DEFAULT_FUZZY_THRESHOLD,
 )
 from reconciliation_core.normalization import available_profiles
 from reconciliation_core.reconcile import generate_sql, reconcile
-
 
 # Synthetic sample datasets ship inside the package (``sample_data`` is
 # declared as package data), so "use sample data" works from a wheel or a

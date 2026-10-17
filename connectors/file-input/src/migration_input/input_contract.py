@@ -15,13 +15,13 @@ import io
 import json
 import re
 import zipfile
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
-from typing import Any, Iterable, Mapping
+from typing import Any
 from xml.etree import ElementTree
 
 from reconciliation_core.reconcile import normalize_header, read_csv_text
-
 
 INPUT_CONTRACT_VERSION = "mvw.input.v1"
 _CELL_REFERENCE_RE = re.compile(r"^[A-Z]{1,3}[1-9][0-9]*$")
@@ -273,7 +273,7 @@ def _read_xlsx(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
 
 def _read_parquet(payload: bytes) -> tuple[list[str], list[dict[str, str]]]:
     try:
-        import pyarrow.parquet as parquet  # type: ignore
+        from pyarrow import parquet  # type: ignore
     except ImportError as exc:
         raise ParquetUnavailable(
             "Parquet input requires PyArrow; install the repository data-lake runtime or use CSV/XLSX"

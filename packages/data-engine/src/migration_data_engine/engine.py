@@ -101,6 +101,6 @@ def profile_dataset(
         return _python_profile(fields, rows, key_field, "python-fallback-large-inline")
     try:
         return _duckdb_profile(fields, rows, key_field)
-    except Exception:
+    except Exception:  # noqa: BLE001 - DuckDB is an optimization; any engine error falls back to the Python profile
         # DuckDB is an optimization boundary, not a reason to reject valid input.
         return _python_profile(fields, rows, key_field, "python-fallback-engine-error")

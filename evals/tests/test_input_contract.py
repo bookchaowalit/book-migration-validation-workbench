@@ -51,7 +51,7 @@ def excel_column(number: int) -> str:
 
 class InputContractTests(unittest.TestCase):
     def test_csv_is_normalized_with_metadata_and_safe_filename(self) -> None:
-        payload = "account_no,customer_name\nA-001,สมชาย ทดสอบ\n".encode("utf-8")
+        payload = "account_no,customer_name\nA-001,สมชาย ทดสอบ\n".encode()
         dataset = read_dataset_bytes(payload, "../exports/customers.csv")
 
         self.assertEqual(dataset.source_format, "csv")
@@ -92,7 +92,7 @@ class InputContractTests(unittest.TestCase):
     )
     def test_parquet_is_supported_when_optional_runtime_is_available(self) -> None:
         import pyarrow as pa
-        import pyarrow.parquet as parquet
+        from pyarrow import parquet
 
         output = io.BytesIO()
         parquet.write_table(pa.table({"id": ["1"], "value": ["ok"]}), output)
@@ -131,9 +131,11 @@ class DatasetShapeLimitTests(unittest.TestCase):
                 read_dataset_bytes(b"a\tb\tc\n1\t2\t3\n", "a.tsv")
 
     def test_xlsx_row_limit_fails_while_parsing(self) -> None:
-        with mock.patch.object(input_contract, "MAX_DATASET_ROWS", 0):
-            with self.assertRaises(DatasetTooLarge):
-                read_dataset_bytes(minimal_xlsx(), "sample.xlsx")
+        with (
+            mock.patch.object(input_contract, "MAX_DATASET_ROWS", 0),
+            self.assertRaises(DatasetTooLarge),
+        ):
+            read_dataset_bytes(minimal_xlsx(), "sample.xlsx")
 
     def test_xlsx_column_limit_is_checked_before_dense_allocation(self) -> None:
         def guarded_range(width: int) -> range:
@@ -160,13 +162,13 @@ class DatasetShapeLimitTests(unittest.TestCase):
                         payload = xlsx_from_rows(
                             *([header, row] if row_number == 2 else [row])
                         )
-                        with mock.patch.object(
-                            input_contract, "range", guarded_range, create=True
+                        with (
+                            mock.patch.object(
+                                input_contract, "range", guarded_range, create=True
+                            ),
+                            self.assertRaisesRegex(DatasetTooLarge, "500 column limit"),
                         ):
-                            with self.assertRaisesRegex(
-                                DatasetTooLarge, "500 column limit"
-                            ):
-                                read_dataset_bytes(payload, "sparse.xlsx")
+                            read_dataset_bytes(payload, "sparse.xlsx")
 
     def test_xlsx_accepts_exactly_500_columns_with_normal_cell_types(self) -> None:
         headers = "".join(

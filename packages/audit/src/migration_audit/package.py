@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Mapping
-
+from collections.abc import Mapping
+from typing import Any
 
 AUDIT_SCHEMA_VERSION = "mvw.audit.v1"
 RULE_VERSION = "reconciliation-core@0.2.0"

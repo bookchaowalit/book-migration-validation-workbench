@@ -10,7 +10,6 @@ from migration_input.input_contract import DatasetInputError, read_dataset_bytes
 
 try:
     from fastapi.testclient import TestClient
-
     from migration_validation_api.server import MAX_BODY_BYTES, app
 except ImportError:  # pragma: no cover - fastapi/httpx are needed for API tests
     TestClient = None
@@ -48,9 +47,11 @@ def xlsx_with_cell(
 class XlsxHardeningTests(unittest.TestCase):
     def test_column_reference_beyond_excel_limit_is_rejected(self) -> None:
         for reference in ("XFE1", "ZZZZZZZ1"):
-            with self.subTest(reference=reference):
-                with self.assertRaises(DatasetInputError):
-                    read_dataset_bytes(xlsx_with_cell(reference), "data.xlsx")
+            with (
+                self.subTest(reference=reference),
+                self.assertRaises(DatasetInputError),
+            ):
+                read_dataset_bytes(xlsx_with_cell(reference), "data.xlsx")
 
     def test_valid_reference_is_accepted(self) -> None:
         dataset = read_dataset_bytes(xlsx_with_cell("A1"), "data.xlsx")
@@ -283,7 +284,7 @@ class ApiTests(unittest.TestCase):
 
         try:
             scripts = metadata.entry_points(group="console_scripts")
-        except Exception:  # pragma: no cover - very old importlib.metadata
+        except Exception:  # noqa: BLE001 - any metadata failure skips the test  # pragma: no cover - very old importlib.metadata
             self.skipTest("entry point metadata unavailable")
         names = {entry.name: entry.value for entry in scripts}
         if "migration-workbench" not in names:

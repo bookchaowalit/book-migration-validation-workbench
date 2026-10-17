@@ -12,7 +12,8 @@ import io
 import re
 import unicodedata
 from collections import defaultdict
-from typing import Any, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from typing import Any
 
 from .fuzzy import (
     DEFAULT_FUZZY_CANDIDATE_LIMIT,
@@ -25,7 +26,6 @@ from .normalization import (
     normalize_value,
     profile_metadata,
 )
-
 
 STATUS_LABELS = {
     "match": "ตรงกัน",

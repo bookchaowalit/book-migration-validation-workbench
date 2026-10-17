@@ -22,8 +22,8 @@ __all__ = [
     "DEFAULT_FUZZY_THRESHOLD",
     "available_profiles",
     "canonical_profile",
-    "fuzzy_score",
     "find_fuzzy_candidates",
+    "fuzzy_score",
     "normalize_value",
     "profile_metadata",
 ]

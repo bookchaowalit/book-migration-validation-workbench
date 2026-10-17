@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from difflib import SequenceMatcher
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from .normalization import normalize_value
-
 
 DEFAULT_FUZZY_THRESHOLD = 0.90
 DEFAULT_FUZZY_CANDIDATE_LIMIT = 3

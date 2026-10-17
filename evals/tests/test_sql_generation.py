@@ -29,18 +29,22 @@ class SqlGenerationTests(unittest.TestCase):
 
     def test_table_names_stay_strict(self) -> None:
         for bad in ("legacy;drop", "legacy table", 'a"b', ""):
-            with self.subTest(table=bad):
-                with self.assertRaisesRegex(ValueError, "identifiers"):
-                    generate_sql(bad, "target", "id", "id", {})
+            with (
+                self.subTest(table=bad),
+                self.assertRaisesRegex(ValueError, "identifiers"),
+            ):
+                generate_sql(bad, "target", "id", "id", {})
         self.assertIn(
             '"main"."legacy"', generate_sql("main.legacy", "target", "id", "id", {})
         )
 
     def test_blank_long_or_control_column_names_are_rejected(self) -> None:
         for bad in ("", "   ", "a\nb", "a\x00b", "c" * 129):
-            with self.subTest(column=repr(bad)[:20]):
-                with self.assertRaisesRegex(ValueError, "column identifiers"):
-                    generate_sql("legacy", "target", bad, "id", {})
+            with (
+                self.subTest(column=repr(bad)[:20]),
+                self.assertRaisesRegex(ValueError, "column identifiers"),
+            ):
+                generate_sql("legacy", "target", bad, "id", {})
 
     @unittest.skipIf(duckdb is None, "duckdb not installed")
     def test_generated_sql_executes_and_finds_differences(self) -> None:
